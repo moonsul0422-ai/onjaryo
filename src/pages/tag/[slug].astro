@@ -1,0 +1,111 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import TopicNav from '../../components/TopicNav.astro';
+import { byTag, orgByCode, usedTags } from '../../lib/data.js';
+import { byTopicOrder } from '../../lib/taxonomy.js';
+import { tagUrl, topicUrl } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  return usedTags.map((tag) => ({
+    params: { slug: tag },
+    props: { tag, items: byTag.get(tag) },
+  }));
+}
+
+const { tag, items } = Astro.props;
+
+const topics = [...new Set(items.flatMap((r: any) => r.topics))].sort(byTopicOrder);
+const orgs = [...new Set(items.map((r: any) => r.orgCode))]
+  .map((c: string) => orgByCode.get(c))
+  .filter(Boolean);
+
+// 태그 페이지 설명도 데이터에서 만든다. 태그가 무엇인지 먼저 밝힌다.
+const sentences = [
+  `‘${tag}’ 태그가 붙은 교육자료 ${items.length}건입니다.`,
+  `태그는 영역보다 좁은 주제어로, 기관을 가로질러 같은 주제를 다룬 자료를 한자리에 모읍니다.`,
+  topics.length === 1
+    ? `이 태그의 자료는 모두 ‘${topics[0]}’ 영역에 속합니다.`
+    : `이 태그는 ${topics.slice(0, 3).join(', ')}${topics.length > 3 ? ' 등' : ''} ${topics.length}개 영역에 걸쳐 있고, ${orgs.length}개 기관이 발행했습니다.`,
+];
+const description = sentences.join(' ');
+const metaDescription = `${tag} 태그가 붙은 교육자료 ${items.length}건. ${topics.join(', ')} 영역.`.slice(0, 155);
+
+// 같이 붙어 다니는 태그. 목록 아래에서 다음 갈 곳을 만들어 준다.
+const neighborCounts = new Map<string, number>();
+for (const r of items) {
+  for (const t of r.tags) {
+    if (t === tag) continue;
+    neighborCounts.set(t, (neighborCounts.get(t) ?? 0) + 1);
+  }
+}
+const neighbors = [...neighborCounts.entries()]
+  .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'))
+  .slice(0, 12);
+---
+
+<Base title={`#${tag} 교육자료`} description={metaDescription} canonical={tagUrl(tag)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      {topics[0] && <li><a href={topicUrl(topics[0])}>{topics[0]}</a></li>}
+      <li aria-current="page">#{tag}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1><span class="hash" aria-hidden="true">#</span>{tag}</h1>
+    <p class="lede">{description}</p>
+  </header>
+
+  {topics.length > 0 && (
+    <nav class="subnav" aria-label="영역으로 넓혀 보기">
+      <span class="subnav-label">이 태그가 속한 영역</span>
+      <ul class="chips">
+        {topics.map((t: string) => (
+          <li><a class="chip chip-sm" href={topicUrl(t)}>{t}</a></li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">#{tag} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  {neighbors.length > 0 && (
+    <nav class="section" aria-label="함께 붙은 태그">
+      <h2 class="topicnav-h">함께 붙은 태그</h2>
+      <ul class="chips">
+        {neighbors.map(([t, n]) => (
+          <li><a class="chip chip-sm" href={tagUrl(t)}>#{t}<span class="n">{n}</span></a></li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <div class="section">
+    <TopicNav heading="영역으로 찾기" headingId="topics-from-tag" />
+  </div>
+</Base>
+
+<style>
+  .hash { color: var(--muted); margin-right: 0.05em; }
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+  }
+  .subnav-label { font-size: 0.82rem; color: var(--muted); }
+  .topicnav-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+</style>

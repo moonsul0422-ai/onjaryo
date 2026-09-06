@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import TopicNav from '../../components/TopicNav.astro';
+import { byTopic, orgByCode, usedTopics } from '../../lib/data.js';
+import { TOPIC_DESCRIPTIONS } from '../../lib/taxonomy.js';
+import { levelUrl, topicUrl } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  // 실제로 자료가 있는 영역만. 빈 페이지를 만들지 않는다.
+  return usedTopics.map((topic) => ({
+    params: { slug: topic },
+    props: { topic, items: byTopic.get(topic) },
+  }));
+}
+
+const { topic, items } = Astro.props;
+const description = TOPIC_DESCRIPTIONS[topic];
+
+// 이 영역 안에서 실제로 쓰인 학교급만 보조 링크로 노출한다.
+const levels = [...new Set(items.flatMap((r: any) => r.schoolLevels))];
+const metaDescription = `${topic} 영역 교육자료 ${items.length}건. ${description}`.slice(0, 155);
+---
+
+<Base title={`${topic} 교육자료`} description={metaDescription} canonical={topicUrl(topic)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      <li aria-current="page">{topic}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{topic}</h1>
+    <p class="lede">{description}</p>
+    <p class="count">자료 {items.length}건</p>
+  </header>
+
+  {levels.length > 0 && (
+    <nav class="subnav" aria-label="학교급으로 좁히기">
+      <span class="subnav-label">학교급</span>
+      <ul class="chips">
+        {levels.map((l: string) => (
+          <li><a class="chip chip-sm" href={levelUrl(l)}>{l}</a></li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">{topic} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  <div class="section">
+    <TopicNav current={topic} heading="다른 영역 보기" headingId="other-topics" />
+  </div>
+</Base>
+
+<style>
+  .count {
+    margin: 0.6rem 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+  }
+  .subnav-label { font-size: 0.82rem; color: var(--muted); }
+</style>

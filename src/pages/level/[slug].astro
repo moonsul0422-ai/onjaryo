@@ -1,0 +1,101 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import TopicNav from '../../components/TopicNav.astro';
+import { byLevel, orgByCode, usedLevels } from '../../lib/data.js';
+import { LEVEL_DESCRIPTIONS, byTopicOrder } from '../../lib/taxonomy.js';
+import { levelUrl, topicUrl } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  return usedLevels.map((level) => ({
+    params: { slug: level },
+    props: { level, items: byLevel.get(level) },
+  }));
+}
+
+const { level, items } = Astro.props;
+const description = LEVEL_DESCRIPTIONS[level];
+
+const topics = [...new Set(items.flatMap((r: any) => r.topics))].sort(byTopicOrder);
+const countByTopic = new Map<string, number>();
+for (const r of items) for (const t of r.topics) countByTopic.set(t, (countByTopic.get(t) ?? 0) + 1);
+
+const metaDescription = `${level} 교육자료 ${items.length}건. ${description}`.slice(0, 155);
+---
+
+<Base title={`${level} 교육자료`} description={metaDescription} canonical={levelUrl(level)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      <li aria-current="page">{level}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{level}</h1>
+    <p class="lede">{description}</p>
+    <p class="count">자료 {items.length}건 · 영역 {topics.length}개</p>
+  </header>
+
+  {topics.length > 0 && (
+    <nav class="subnav" aria-label="영역으로 좁히기">
+      <span class="subnav-label">이 학교급의 영역</span>
+      <ul class="chips">
+        {topics.map((t: string) => (
+          <li>
+            <a class="chip chip-sm" href={topicUrl(t)}>
+              {t}<span class="n">{countByTopic.get(t)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">{level} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  <nav class="section levelnav" aria-label="다른 학교급 보기">
+    <h2 class="topicnav-h">다른 학교급 보기</h2>
+    <ul class="chips">
+      {usedLevels.map((l: string) => (
+        <li>
+          <a class="chip" href={levelUrl(l)} aria-current={l === level ? 'page' : undefined}>
+            {l}<span class="n">{byLevel.get(l).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+
+  <div class="section">
+    <TopicNav heading="영역으로 찾기" headingId="topics-from-level" />
+  </div>
+</Base>
+
+<style>
+  .count {
+    margin: 0.6rem 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+  }
+  .subnav-label { font-size: 0.82rem; color: var(--muted); }
+  .topicnav-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+</style>

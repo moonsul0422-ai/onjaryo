@@ -1,0 +1,186 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import {
+  byOrg, childOrgs, orgByCode, orgLineage, usedOrgCodes,
+} from '../../lib/data.js';
+import { byTopicOrder } from '../../lib/taxonomy.js';
+import { orgUrl, topicUrl, withEun, withI } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  // 자료가 한 건이라도 연결된 기관만.
+  return usedOrgCodes.map((code) => ({
+    params: { code },
+    props: { org: orgByCode.get(code), items: byOrg.get(code) },
+  }));
+}
+
+const { org, items } = Astro.props;
+const lineage = orgLineage(org);
+const parents = lineage.slice(0, -1);
+const children = childOrgs(org);
+
+const topics = [...new Set(items.flatMap((r: any) => r.topics))].sort(byTopicOrder);
+const countByTopic = new Map<string, number>();
+for (const r of items) for (const t of r.topics) countByTopic.set(t, (countByTopic.get(t) ?? 0) + 1);
+
+const years = items.map((r: any) => r.year).filter(Boolean) as number[];
+const yearRange = years.length
+  ? (Math.min(...years) === Math.max(...years)
+      ? `${years[0]}년`
+      : `${Math.min(...years)}~${Math.max(...years)}년`)
+  : null;
+
+// 기관 페이지 설명은 데이터에서 만든다. 세 문장을 넘기지 않는다.
+const intro = org.orgType
+  ? (org.region && org.region !== '전국'
+      ? `${withEun(org.name)} ${org.region} 지역의 ${org.orgType}입니다.`
+      : `${withEun(org.name)} 전국을 대상으로 하는 ${org.orgType}입니다.`)
+  : `${withI(org.name)} 공개한 교육자료를 모았습니다.`;
+
+const sentences = [
+  intro,
+  `이곳에 모은 자료는 ${items.length}건이며, ${topics.length}개 영역에 걸쳐 있습니다${yearRange ? `(${yearRange} 발행)` : ''}.`,
+  parents.length
+    ? `${parents.map((o: any) => o.name).join(' › ')} 소속 기관이며, 원문은 모두 ${org.shortName} 사이트에 있습니다.`
+    : `원문 파일은 모두 ${org.shortName} 사이트에 있고, 이 페이지에는 찾아가는 링크만 둡니다.`,
+];
+const description = sentences.join(' ');
+const metaDescription = `${org.name} 교육자료 ${items.length}건. ${topics.slice(0, 5).join(', ')} 등 ${topics.length}개 영역.`.slice(0, 155);
+---
+
+<Base title={`${org.name} 교육자료`} description={metaDescription} canonical={orgUrl(org.code)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      {parents.map((o: any) => (
+        <li>{byOrg.has(o.code) ? <a href={orgUrl(o.code)}>{o.shortName}</a> : <span>{o.shortName}</span>}</li>
+      ))}
+      <li aria-current="page">{org.shortName}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{org.name}</h1>
+    <p class="lede">{description}</p>
+
+    <dl class="orgfacts">
+      {org.region && (
+        <div><dt>지역</dt><dd>{org.region}</dd></div>
+      )}
+      {org.orgType && (
+        <div><dt>기관 유형</dt><dd>{org.orgType}</dd></div>
+      )}
+      <div>
+        <dt>소속 관계</dt>
+        <dd>
+          {parents.length === 0 ? (
+            <span class="muted">상위 기관 없음</span>
+          ) : (
+            <ul class="inline-links">
+              {parents.map((o: any) => (
+                <li>{byOrg.has(o.code) ? <a href={orgUrl(o.code)}>{o.name}</a> : <span>{o.name}</span>}</li>
+              ))}
+            </ul>
+          )}
+        </dd>
+      </div>
+      {org.homepage && (
+        <div>
+          <dt>홈페이지</dt>
+          <dd>
+            <a href={org.homepage} rel="noopener nofollow" class="src-url">{org.homepage}</a>
+          </dd>
+        </div>
+      )}
+    </dl>
+  </header>
+
+  {children.length > 0 && (
+    <nav class="subnav" aria-label="소속 기관">
+      <span class="subnav-label">소속 기관</span>
+      <ul class="chips">
+        {children.map((c: any) => (
+          <li>
+            <a class="chip chip-sm" href={orgUrl(c.code)}>
+              {c.shortName}<span class="n">{byOrg.get(c.code).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  {topics.length > 0 && (
+    <nav class="subnav" aria-label="영역으로 좁히기">
+      <span class="subnav-label">영역</span>
+      <ul class="chips">
+        {topics.map((t: string) => (
+          <li>
+            <a class="chip chip-sm" href={topicUrl(t)}>
+              {t}<span class="n">{countByTopic.get(t)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">{org.shortName} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={org} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  <nav class="section" aria-label="다른 기관 보기">
+    <h2 class="topicnav-h">다른 기관 보기</h2>
+    <ul class="chips">
+      {usedOrgCodes.map((code: string) => (
+        <li>
+          <a class="chip" href={orgUrl(code)} aria-current={code === org.code ? 'page' : undefined}>
+            {orgByCode.get(code).shortName}<span class="n">{byOrg.get(code).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</Base>
+
+<style>
+  .orgfacts {
+    margin: 1rem 0 0;
+    display: grid;
+    gap: 0.1rem;
+    border-top: 1px solid var(--line);
+  }
+  .orgfacts > div {
+    display: grid;
+    grid-template-columns: 7rem 1fr;
+    gap: 0.2rem 0.8rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .orgfacts dt { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .orgfacts dd { margin: 0; font-size: 0.9rem; }
+
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.1rem;
+  }
+  .subnav-label { font-size: 0.82rem; color: var(--muted); }
+  .topicnav-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+  .src-url { word-break: break-all; }
+
+  @media (max-width: 30rem) {
+    .orgfacts > div { grid-template-columns: 1fr; }
+  }
+</style>

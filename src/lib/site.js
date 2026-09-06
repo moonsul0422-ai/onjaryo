@@ -48,3 +48,19 @@ export function formatDateShort(iso) {
   if (!m) return iso;
   return `${m[1]}.${m[2]}.${m[3]}`;
 }
+
+/**
+ * 한글 조사 선택. 마지막 글자의 받침 유무로 고른다.
+ * 한글이 아닌 글자로 끝나면(영문 약칭 등) 받침 없는 쪽을 쓴다.
+ */
+export function particle(word, withBatchim, withoutBatchim) {
+  const last = String(word || '').trim().slice(-1);
+  const code = last.charCodeAt(0);
+  const isHangul = code >= 0xac00 && code <= 0xd7a3;
+  if (!isHangul) return withoutBatchim;
+  return (code - 0xac00) % 28 !== 0 ? withBatchim : withoutBatchim;
+}
+
+/** "교육부" → "교육부는", "서울교육청" → "서울교육청은" */
+export const withEun = (w) => `${w}${particle(w, '은', '는')}`;
+export const withI = (w) => `${w}${particle(w, '이', '가')}`;

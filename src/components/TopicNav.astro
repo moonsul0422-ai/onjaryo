@@ -1,0 +1,40 @@
+---
+// 영역 바로가기. 자료가 0건인 영역은 아예 만들지 않는다(usedTopics 가 걸러 준다).
+import { byTopic, usedTopics } from '../lib/data.js';
+import { topicUrl } from '../lib/site.js';
+
+interface Props {
+  current?: string | null;
+  heading?: string | null;
+  headingId?: string;
+}
+
+const { current = null, heading = null, headingId = 'topicnav-h' } = Astro.props;
+---
+
+<nav class="topicnav" aria-labelledby={heading ? headingId : undefined} aria-label={heading ? undefined : '영역 바로가기'}>
+  {heading && <h2 id={headingId} class="topicnav-h">{heading}</h2>}
+  <ul class="chips">
+    {usedTopics.map((topic) => (
+      <li>
+        <a
+          class="chip"
+          href={topicUrl(topic)}
+          aria-current={topic === current ? 'page' : undefined}
+        >
+          {topic}
+          <span class="n">{byTopic.get(topic).length}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .topicnav-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+</style>
