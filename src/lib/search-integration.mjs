@@ -39,12 +39,42 @@ export async function writeSearchIndex(logger) {
   return index.length;
 }
 
+/**
+ * public/robots.txt 는 정적 파일이라 도메인이 박혀 있다.
+ * astro.config 의 site 와 어긋나면 사이트맵을 엉뚱한 곳으로 알린다.
+ * 빌드 때 한 번 맞춰 보고 다르면 경고한다.
+ */
+async function checkRobots(site, logger) {
+  const path = resolve(ROOT, 'public/robots.txt');
+  if (!existsSync(path)) {
+    logger?.warn('public/robots.txt 가 없습니다.');
+    return;
+  }
+  const { readFile } = await import('node:fs/promises');
+  const text = await readFile(path, 'utf8');
+  const match = /^\s*Sitemap:\s*(\S+)/im.exec(text);
+  if (!match) {
+    logger?.warn('public/robots.txt 에 Sitemap 줄이 없습니다.');
+    return;
+  }
+  const expected = new URL('/sitemap.xml', site).href;
+  if (match[1] !== expected) {
+    logger?.warn(
+      `robots.txt 의 Sitemap 이 site 설정과 다릅니다.\n` +
+        `  robots.txt: ${match[1]}\n` +
+        `  site:       ${expected}\n` +
+        `  public/robots.txt 를 고치거나 SITE_URL 을 맞춰 주세요.`
+    );
+  }
+}
+
 export function searchIndexIntegration() {
   return {
     name: 'onjaryo:search-index',
     hooks: {
-      'astro:config:setup': async ({ logger }) => {
+      'astro:config:setup': async ({ config, logger }) => {
         await writeSearchIndex(logger);
+        await checkRobots(config.site, logger);
       },
     },
   };

@@ -1,0 +1,140 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+import ResourceCard from '../components/ResourceCard.astro';
+import TopicNav from '../components/TopicNav.astro';
+import {
+  byLevel, byOrg, meta, orgByCode, recent, usedLevels, usedOrgCodes,
+} from '../lib/data.js';
+import { SITE_DESCRIPTION, SITE_NAME, formatDate, levelUrl, orgUrl } from '../lib/site.js';
+
+const latest = recent(10);
+const topOrgs = usedOrgCodes.slice(0, 8);
+---
+
+<Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
+  <section class="hero">
+    <h1>필요한 교육자료, 여기서 한 번에</h1>
+    <p class="hero-lede">
+      시·도교육청과 산하기관이 공개한 자료를 영역과 학교급으로 정리했습니다.
+      제목·요약·태그·기관명을 한꺼번에 찾습니다.
+    </p>
+    <SearchBox id="q-home" size="lg" label="자료 검색" />
+    <p class="hero-hint">
+      띄어쓰기는 신경 쓰지 않아도 됩니다. <b>안전 교육</b>과 <b>안전교육</b>이 같은 결과를 냅니다.
+    </p>
+  </section>
+
+  <section class="section" aria-labelledby="topics-h">
+    <div class="section-head">
+      <h2 id="topics-h">영역으로 찾기</h2>
+      <a href="/search">검색으로 찾기</a>
+    </div>
+    <TopicNav />
+  </section>
+
+  <section class="section" aria-labelledby="levels-h">
+    <div class="section-head">
+      <h2 id="levels-h">학교급으로 찾기</h2>
+    </div>
+    <ul class="chips">
+      {usedLevels.map((l: string) => (
+        <li>
+          <a class="chip" href={levelUrl(l)}>{l}<span class="n">{byLevel.get(l).length}</span></a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="section" aria-labelledby="recent-h">
+    <div class="section-head">
+      <h2 id="recent-h">최근 등록</h2>
+      <a href="/search">전체 검색</a>
+    </div>
+    <ul class="rlist">
+      {latest.map((r: any) => (
+        <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="section" aria-labelledby="orgs-h">
+    <div class="section-head">
+      <h2 id="orgs-h">기관으로 찾기</h2>
+    </div>
+    <ul class="chips">
+      {topOrgs.map((code: string) => (
+        <li>
+          <a class="chip" href={orgUrl(code)}>
+            {orgByCode.get(code).shortName}<span class="n">{byOrg.get(code).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="section stats" aria-labelledby="stats-h">
+    <h2 id="stats-h" class="visually-hidden">등록 현황</h2>
+    <dl class="statlist">
+      <div>
+        <dt>등록 자료</dt>
+        <dd>{meta.total.toLocaleString('ko-KR')}건</dd>
+      </div>
+      <div>
+        <dt>기관</dt>
+        <dd>{meta.orgCount}곳</dd>
+      </div>
+      <div>
+        <dt>마지막 갱신</dt>
+        <dd><time datetime={meta.syncedAt}>{formatDate(meta.syncedAt.slice(0, 10))}</time></dd>
+      </div>
+    </dl>
+    <p class="stats-note">
+      자료 목록은 매일 한 번 갱신됩니다. 빠진 자료가 있다면 <a href="/submit">제보</a>해 주세요.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    padding: 1.5rem 0 0.5rem;
+    max-width: 42rem;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.3rem);
+    margin-bottom: 0.5rem;
+  }
+  .hero-lede {
+    color: var(--muted);
+    font-size: 1.02rem;
+    margin-bottom: 1.1rem;
+  }
+  .hero-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+  .hero-hint b { color: var(--ink); font-weight: 600; }
+
+  .statlist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 2rem;
+    margin: 0 0 0.7rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .statlist > div { display: flex; flex-direction: column; }
+  .statlist dt { font-size: 0.78rem; color: var(--muted); }
+  .statlist dd {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-note { margin: 0; font-size: 0.85rem; color: var(--muted); }
+</style>

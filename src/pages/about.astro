@@ -1,0 +1,121 @@
+---
+import Base from '../layouts/Base.astro';
+import { meta, usedOrgCodes, orgByCode, byOrg } from '../lib/data.js';
+import { TOPICS } from '../lib/taxonomy.js';
+import { CONTACT_EMAIL, SITE_NAME, orgUrl } from '../lib/site.js';
+
+const description = `${SITE_NAME}가 무엇을 모으고 무엇을 모으지 않는지, 자료를 어떻게 분류하고 링크를 어떻게 관리하는지 정리했습니다.`;
+---
+
+<Base title="소개" description={description} canonical="/about/">
+  <header class="page-head">
+    <h1>{SITE_NAME} 소개</h1>
+    <p class="lede">
+      교육청과 산하기관이 만든 좋은 자료는 이미 많습니다. 문제는 기관마다 사이트가 달라
+      어디에 무엇이 있는지 알기 어렵다는 점입니다. {SITE_NAME}는 그 자료들을 한 곳에 모아
+      찾아가는 길만 정리합니다.
+    </p>
+  </header>
+
+  <section class="prose">
+    <h2>무엇을 모으나</h2>
+    <p>
+      시·도교육청, 교육부, 그 산하 연구·공공기관이 <b>이미 공개한</b> 교육자료를 모읍니다.
+      수업에 바로 쓰는 지도안과 활동지, 업무에 쓰는 양식과 지침, 연수자료와 보고서가
+      대상입니다. 지금은 {meta.total}건이 {meta.orgCount}개 기관에서 모였습니다.
+    </p>
+    <p>
+      모든 자료에는 한두 문장 요약과 <b>“언제 쓰나”</b> 한 줄을 답니다. 제목만 봐서는
+      무엇에 쓰는 자료인지 알기 어려운 경우가 많기 때문입니다. 요약은 원문을 옮겨 붙이지 않고
+      직접 씁니다.
+    </p>
+
+    <h2>무엇을 하지 않나</h2>
+    <ul>
+      <li><b>파일을 올리거나 보관하지 않습니다.</b> 모든 링크는 발행 기관 사이트로 갑니다.</li>
+      <li><b>회원가입이 없습니다.</b> 로그인, 즐겨찾기, 댓글, 별점 모두 두지 않습니다.</li>
+      <li><b>기관 사이트를 긁어오지 않습니다.</b> 사람이 확인해서 손으로 등록합니다.</li>
+      <li><b>광고를 붙이지 않습니다.</b></li>
+    </ul>
+    <p>
+      원문 저작권은 각 발행 기관에 있습니다. 이용 조건(공공누리 유형)은 자료마다
+      상세 페이지에 표시하며, 표시가 없는 자료는 <b>미표기</b>로 둡니다. 미표기 자료를
+      다시 배포하려면 발행 기관에 먼저 확인하세요.
+    </p>
+
+    <h2>어떻게 분류하나</h2>
+    <p>
+      자료마다 <b>영역</b>을 하나 이상 답니다. 영역은 아래 {TOPICS.length}개로 고정되어 있고,
+      한 번 정한 값은 바꾸지 않습니다. 주소가 그 값으로 만들어지기 때문에, 이름을 바꾸면
+      그동안 공유된 링크가 모두 끊깁니다.
+    </p>
+    <p class="topiclist">{TOPICS.join(' · ')}</p>
+    <p>
+      영역 외에 학교급(유아·초등·중학·고교·특수·전체), 대상, 자료 유형, 태그를 함께 답니다.
+      태그는 영역보다 좁은 주제어로, 기관을 가로질러 같은 주제를 묶는 데 씁니다.
+    </p>
+
+    <h2>링크가 끊기면</h2>
+    <p>
+      기관 사이트는 개편이 잦아 링크가 끊기곤 합니다. 한 달에 한 번 전체 링크를 자동으로
+      점검하고, 끊긴 링크는 새 주소를 찾아 고치거나 목록에서 내립니다. 끊긴 링크를 발견하시면
+      <a href="/submit">제보</a>로 알려 주세요.
+    </p>
+
+    <h2>검색은 어떻게 동작하나</h2>
+    <p>
+      검색은 서버 없이 브라우저에서 돕니다. 자료의 제목·요약·활용팁·태그·영역·기관명을
+      하나로 이어 붙인 뒤 <b>띄어쓰기와 문장부호를 모두 지운</b> 색인을 미리 만들어 두고,
+      질의도 같은 방식으로 다듬어 맞춰 봅니다. 그래서 “안전 교육”과 “안전교육”이 같은 결과를 냅니다.
+    </p>
+    <p>
+      낱말을 띄어 여러 개 넣으면 <b>모두 들어 있는</b> 자료만 남습니다.
+      목록과 상세 페이지는 미리 만들어 둔 정적 문서라 자바스크립트 없이도 그대로 읽힙니다.
+      자바스크립트가 필요한 곳은 검색뿐입니다.
+    </p>
+
+    <h2>모인 기관</h2>
+    <ul class="orglist">
+      {usedOrgCodes.map((code: string) => (
+        <li>
+          <a href={orgUrl(code)}>{orgByCode.get(code).name}</a>
+          <span class="muted"> {byOrg.get(code).length}건</span>
+        </li>
+      ))}
+    </ul>
+
+    <h2>연락</h2>
+    <p>
+      자료 제보와 오류 신고는 <a href="/submit">제보 페이지</a>를 이용해 주세요.
+      그 밖의 문의는 <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> 로 보내 주시면 됩니다.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .prose { max-width: 42rem; }
+  .prose h2 {
+    margin-top: 2rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--line);
+  }
+  .prose b { font-weight: 600; }
+  .prose li { margin-bottom: 0.35rem; }
+  .topiclist {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.75rem 0.9rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .orglist {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.2rem 1rem;
+  }
+  .orglist li { font-size: 0.92rem; }
+</style>
