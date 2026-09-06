@@ -5,7 +5,7 @@ import resourcesRaw from '../data/resources.json';
 import organizationsRaw from '../data/organizations.json';
 import metaRaw from '../data/meta.json';
 
-import { byLevelOrder, byTopicOrder } from './taxonomy.js';
+import { byLevelOrder, byTopicOrder, byTypeOrder } from './taxonomy.js';
 
 /** @type {import('./types.js').Resource[]} */
 export const resources = resourcesRaw;
@@ -39,6 +39,8 @@ export const usedTopics = [...byTopic.keys()].sort(byTopicOrder);
 export const usedLevels = [...byLevel.keys()].sort(byLevelOrder);
 export const usedTags = [...byTag.keys()].sort((a, b) => byTag.get(b).length - byTag.get(a).length || a.localeCompare(b, 'ko'));
 export const usedOrgCodes = [...byOrg.keys()].filter((c) => orgByCode.has(c)).sort((a, b) => byOrg.get(b).length - byOrg.get(a).length || a.localeCompare(b));
+
+export const usedTypes = [...byType.keys()].sort(byTypeOrder);
 
 export const countOf = (map, key) => map.get(key)?.length ?? 0;
 

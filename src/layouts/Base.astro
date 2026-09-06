@@ -138,6 +138,10 @@ const isSample = meta.source !== 'sheet';
       *::before,
       *::after { box-sizing: border-box; }
 
+      /* .btn 이나 .filterbar 처럼 display 를 지정한 클래스가 UA 의 [hidden] 규칙을
+         이겨 버린다. hidden 을 토글해 여닫는 곳이 여럿이라 전역으로 못 박는다. */
+      [hidden] { display: none !important; }
+
       html { -webkit-text-size-adjust: 100%; }
 
       body {

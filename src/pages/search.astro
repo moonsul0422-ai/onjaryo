@@ -1,0 +1,384 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+import FilterBar from '../components/FilterBar.astro';
+import TopicNav from '../components/TopicNav.astro';
+import { meta } from '../lib/data.js';
+import { SITE_NAME } from '../lib/site.js';
+
+// 정적 페이지라 ?q= 는 서버가 볼 수 없다. 스크립트가 주소창에서 읽어 채운다.
+// 그래도 URL 자체는 공유 가능하다 — 열면 같은 결과가 나온다.
+const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 제목·요약·태그·기관명으로 한 번에 찾습니다. 띄어쓰기가 달라도 같은 결과가 나옵니다.`;
+---
+
+<Base title="자료 검색" description={description} canonical="/search/">
+  <header class="page-head">
+    <h1>자료 검색</h1>
+    <p class="lede">
+      제목과 요약, 활용팁, 태그, 기관명을 함께 찾습니다.
+      띄어쓰기는 무시하므로 <b>안전 교육</b>과 <b>안전교육</b>이 같은 결과를 냅니다.
+      낱말을 띄어 여러 개 넣으면 <b>모두 들어 있는</b> 자료만 남습니다.
+    </p>
+  </header>
+
+  <SearchBox id="q" size="lg" label="자료 검색" autofocus />
+
+  <noscript>
+    <div class="note noscript-note">
+      <p>
+        검색은 브라우저에서 동작합니다. 자바스크립트가 꺼져 있으면 결과를 그릴 수 없습니다.
+        아래 영역 목록이나 <a href="/">홈</a>에서 분류를 따라가면 자바스크립트 없이도 자료를 모두 볼 수 있습니다.
+      </p>
+    </div>
+  </noscript>
+
+  <div id="search-app" hidden>
+    <FilterBar />
+
+    <p class="result-status" id="result-status" role="status" aria-live="polite"></p>
+
+    <ul class="rlist" id="result-list"></ul>
+
+    <p class="more-wrap">
+      <button class="btn btn-quiet" type="button" id="more-btn" hidden>결과 20건 더 보기</button>
+    </p>
+
+    <div class="empty note" id="empty-box" hidden>
+      <p id="empty-lead"></p>
+      <p>
+        낱말 수를 줄이거나 띄어쓰기를 바꿔 다시 찾아보세요. 그래도 없다면 아직 등록되지 않은 자료일 수 있습니다.
+        <a href="/submit">자료 제보</a>로 알려 주시면 확인해 등록합니다.
+      </p>
+    </div>
+  </div>
+
+  <div class="section">
+    <TopicNav heading="영역으로 찾기" headingId="topics-from-search" />
+  </div>
+</Base>
+
+<script>
+  import {
+    applyFilters, facetCounts, prepareIndex, search, tokenize,
+    MAX_RESULTS, PAGE_SIZE,
+  } from '../lib/search.js';
+
+  type Entry = {
+    i: string; t: string; o: string; d: string; k: string; nt?: string;
+    l?: string[]; p?: string[]; y?: string;
+  };
+  type Hit = { entry: Entry; score: number };
+
+  const app = document.getElementById('search-app') as HTMLElement;
+  const form = document.querySelector('.searchbox') as HTMLFormElement;
+  const input = document.getElementById('q') as HTMLInputElement;
+  const statusEl = document.getElementById('result-status') as HTMLElement;
+  const listEl = document.getElementById('result-list') as HTMLElement;
+  const moreBtn = document.getElementById('more-btn') as HTMLButtonElement;
+  const emptyBox = document.getElementById('empty-box') as HTMLElement;
+  const emptyLead = document.getElementById('empty-lead') as HTMLElement;
+  const filterBar = document.querySelector('[data-filterbar]') as HTMLElement;
+  const resetBtn = document.querySelector('[data-filter-reset]') as HTMLButtonElement;
+  const selects = Array.from(
+    document.querySelectorAll<HTMLSelectElement>('[data-filter]')
+  );
+
+  app.hidden = false;
+  filterBar.hidden = false;
+
+  let index: Entry[] | null = null;
+  let loading: Promise<Entry[]> | null = null;
+  let hits: Hit[] = [];
+  let shown = 0;
+  let lastQuery = '';
+
+  const FILTER_KEYS = ['level', 'topic', 'type'] as const;
+  type FilterKey = (typeof FILTER_KEYS)[number];
+  const filters: Record<FilterKey, string> = { level: '', topic: '', type: '' };
+
+  /* ------------------------------------------------------------ 색인 로딩 */
+
+  function loadIndex(): Promise<Entry[]> {
+    if (index) return Promise.resolve(index);
+    if (loading) return loading;
+    loading = fetch('/search-index.json', { cache: 'force-cache' })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: Entry[]) => {
+        index = prepareIndex(data) as Entry[];
+        return index;
+      })
+      .catch((err) => {
+        loading = null;
+        throw err;
+      });
+    return loading;
+  }
+
+  /* -------------------------------------------------------------- 렌더링 */
+
+  const topicHref = (t: string) => `/topic/${encodeURIComponent(t)}/`;
+  const shortDate = (d: string) => (d ? d.replace(/-/g, '.') : '');
+
+  function renderCard(entry: Entry): HTMLLIElement {
+    const li = document.createElement('li');
+    const article = document.createElement('article');
+    article.className = 'rcard rcard-compact';
+
+    const h3 = document.createElement('h3');
+    h3.className = 'rcard-title';
+    const a = document.createElement('a');
+    a.href = `/r/${encodeURIComponent(entry.i)}/`;
+    a.textContent = entry.t;
+    h3.append(a);
+
+    const metaP = document.createElement('p');
+    metaP.className = 'rcard-meta';
+    const org = document.createElement('span');
+    org.className = 'rcard-org';
+    org.textContent = entry.o;
+    metaP.append(org);
+    if (entry.d) {
+      const dot = document.createElement('span');
+      dot.setAttribute('aria-hidden', 'true');
+      dot.textContent = '·';
+      const time = document.createElement('time');
+      time.dateTime = entry.d;
+      time.textContent = shortDate(entry.d);
+      metaP.append(dot, time);
+    }
+    if (entry.y) {
+      const dot = document.createElement('span');
+      dot.setAttribute('aria-hidden', 'true');
+      dot.textContent = '·';
+      const type = document.createElement('span');
+      type.textContent = entry.y;
+      metaP.append(dot, type);
+    }
+
+    article.append(h3, metaP);
+
+    if (entry.p?.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'rcard-topics';
+      for (const t of entry.p) {
+        const item = document.createElement('li');
+        const chip = document.createElement('a');
+        chip.className = 'chip chip-sm';
+        chip.href = topicHref(t);
+        chip.textContent = t;
+        item.append(chip);
+        ul.append(item);
+      }
+      article.append(ul);
+    }
+
+    li.append(article);
+    return li;
+  }
+
+  function renderMore(visible: Hit[]) {
+    const frag = document.createDocumentFragment();
+    for (const hit of visible) frag.append(renderCard(hit.entry));
+    listEl.append(frag);
+  }
+
+  /* ------------------------------------------------------------ 필터 갱신 */
+
+  function refreshFacets(base: Hit[]) {
+    const counts = facetCounts(base);
+    for (const select of selects) {
+      const key = select.dataset.filter as FilterKey;
+      const map = counts[key] as Map<string, number>;
+      for (const option of Array.from(select.options)) {
+        if (!option.value) continue;
+        const n = map.get(option.value) ?? 0;
+        option.textContent = n > 0 ? `${option.value} (${n})` : option.value;
+        // 지금 고른 값은 0건이 되어도 끄지 않는다. 스스로 해제할 수 없게 되기 때문이다.
+        option.disabled = n === 0 && option.value !== filters[key];
+      }
+    }
+    resetBtn.hidden = !FILTER_KEYS.some((k) => filters[k]);
+  }
+
+  /* -------------------------------------------------------------- 상태 표시 */
+
+  function setStatus(text: string) {
+    statusEl.textContent = text;
+  }
+
+  function showEmpty(query: string, filtered: boolean) {
+    emptyLead.textContent = filtered
+      ? `‘${query}’ 검색 결과 중 지금 건 필터에 맞는 자료가 없습니다.`
+      : `‘${query}’ 와(과) 맞는 자료가 없습니다.`;
+    emptyBox.hidden = false;
+  }
+
+  /* ---------------------------------------------------------------- 실행 */
+
+  function paint() {
+    const query = input.value.trim();
+    listEl.replaceChildren();
+    emptyBox.hidden = true;
+    moreBtn.hidden = true;
+    shown = 0;
+
+    if (!query) {
+      setStatus('');
+      refreshFacets([]);
+      return;
+    }
+    if (!index) {
+      setStatus('색인을 불러오는 중입니다…');
+      return;
+    }
+
+    const base = search(index, query, { limit: MAX_RESULTS });
+    refreshFacets(base);
+    const filtered = applyFilters(base, filters);
+    hits = filtered;
+
+    if (filtered.length === 0) {
+      setStatus('결과 없음');
+      showEmpty(query, base.length > 0);
+      return;
+    }
+
+    const capped = base.length >= MAX_RESULTS;
+    const activeFilters = FILTER_KEYS.filter((k) => filters[k]).length;
+    setStatus(
+      `‘${query}’ 결과 ${filtered.length}건` +
+        (activeFilters ? ' (필터 적용)' : '') +
+        (capped ? ` · 상위 ${MAX_RESULTS}건까지 보여 줍니다` : '')
+    );
+    showNextPage();
+  }
+
+  function showNextPage() {
+    const next = hits.slice(shown, shown + PAGE_SIZE);
+    renderMore(next);
+    shown += next.length;
+    const remain = hits.length - shown;
+    moreBtn.hidden = remain <= 0;
+    if (remain > 0) {
+      moreBtn.textContent = `결과 ${Math.min(PAGE_SIZE, remain)}건 더 보기 (남은 ${remain}건)`;
+    }
+  }
+
+  /* ------------------------------------------------------------------ URL */
+
+  function syncUrl(replace = true) {
+    const params = new URLSearchParams();
+    const query = input.value.trim();
+    if (query) params.set('q', query);
+    for (const key of FILTER_KEYS) if (filters[key]) params.set(key, filters[key]);
+    const qs = params.toString();
+    const url = qs ? `${location.pathname}?${qs}` : location.pathname;
+    if (replace) history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
+  }
+
+  function readUrl() {
+    const params = new URLSearchParams(location.search);
+    input.value = params.get('q') ?? '';
+    for (const key of FILTER_KEYS) filters[key] = params.get(key) ?? '';
+    for (const select of selects) {
+      const key = select.dataset.filter as FilterKey;
+      select.value = filters[key];
+      // URL 에 색인에 없는 값이 들어 있으면 select 가 못 받는다. 그럼 비운다.
+      if (select.value !== filters[key]) filters[key] = select.value = '';
+    }
+  }
+
+  /* --------------------------------------------------------------- 이벤트 */
+
+  async function run(fromUrl = false) {
+    if (!fromUrl) syncUrl();
+    const query = input.value.trim();
+    if (!query) { paint(); return; }
+
+    if (!index) {
+      setStatus('색인을 불러오는 중입니다…');
+      try {
+        await loadIndex();
+      } catch {
+        setStatus('');
+        listEl.replaceChildren();
+        emptyLead.textContent = '검색 색인을 불러오지 못했습니다. 새로고침하거나 잠시 뒤 다시 시도해 주세요.';
+        emptyBox.hidden = false;
+        return;
+      }
+      // 기다리는 동안 질의가 바뀌었을 수 있다. 마지막 값으로 다시 그린다.
+      if (input.value.trim() !== query) return;
+    }
+    lastQuery = query;
+    paint();
+  }
+
+  let timer: number | undefined;
+  input.addEventListener('input', () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => { void run(); }, 140);
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    window.clearTimeout(timer);
+    void run();
+    input.blur();
+  });
+
+  for (const select of selects) {
+    select.addEventListener('change', () => {
+      const key = select.dataset.filter as FilterKey;
+      filters[key] = select.value;
+      syncUrl();
+      paint();
+    });
+  }
+
+  resetBtn.addEventListener('click', () => {
+    for (const key of FILTER_KEYS) filters[key] = '';
+    for (const select of selects) select.value = '';
+    syncUrl();
+    paint();
+  });
+
+  moreBtn.addEventListener('click', () => {
+    showNextPage();
+    // 새로 붙은 첫 카드로 초점을 옮겨 키보드 사용자가 흐름을 잃지 않게 한다.
+    const cards = listEl.querySelectorAll<HTMLAnchorElement>('.rcard-title a');
+    cards[Math.max(0, shown - PAGE_SIZE)]?.focus();
+  });
+
+  window.addEventListener('popstate', () => {
+    readUrl();
+    void run(true);
+  });
+
+  // 진입 시 ?q= 가 있으면 바로 찾는다. 없으면 첫 입력 때 색인을 부른다.
+  readUrl();
+  if (input.value.trim()) {
+    void run(true);
+  } else {
+    input.focus();
+  }
+  void lastQuery;
+</script>
+
+<style>
+  .noscript-note { margin-top: 1.1rem; }
+  .result-status {
+    margin: 1rem 0 0.8rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+    min-height: 1.4em;
+    font-variant-numeric: tabular-nums;
+  }
+  .more-wrap { margin: 1.1rem 0 0; }
+  .empty { margin-top: 1rem; }
+  .empty :last-child { margin-bottom: 0; }
+  #search-app { margin-top: 1.2rem; }
+</style>

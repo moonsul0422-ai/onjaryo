@@ -1,0 +1,63 @@
+---
+// 검색 결과 화면에서만 쓴다. 홈에는 필터를 두지 않는다.
+// 서버에서 전체 선택지를 그려 두고, 스크립트가 현재 결과에 맞춰
+// 건수를 붙이고 0건인 선택지를 비활성화한다.
+import { byLevel, byTopic, byType, usedLevels, usedTopics, usedTypes } from '../lib/data.js';
+
+const groups = [
+  { key: 'level', label: '학교급', values: usedLevels, counts: byLevel },
+  { key: 'topic', label: '영역', values: usedTopics, counts: byTopic },
+  { key: 'type', label: '자료 유형', values: usedTypes, counts: byType },
+];
+---
+
+<div class="filterbar" data-filterbar hidden>
+  <h2 class="visually-hidden">결과 좁히기</h2>
+  {groups.map((g) => (
+    <p class="filter">
+      <label class="filter-label" for={`filter-${g.key}`}>{g.label}</label>
+      <select class="filter-select" id={`filter-${g.key}`} name={g.key} data-filter={g.key}>
+        <option value="">전체</option>
+        {g.values.map((v: string) => (
+          <option value={v} data-total={g.counts.get(v).length}>{v}</option>
+        ))}
+      </select>
+    </p>
+  ))}
+  <button class="btn btn-quiet filter-reset" type="button" data-filter-reset hidden>필터 해제</button>
+</div>
+
+<style>
+  .filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.6rem;
+    padding: 0.85rem 0.95rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: 1.1rem;
+  }
+  .filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+    flex: 1 1 9rem;
+    min-width: 0;
+  }
+  .filter-label { font-size: 0.78rem; color: var(--muted); }
+  .filter-select {
+    width: 100%;
+    padding: 0.42rem 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  .filter-select option:disabled { color: #b4bac4; }
+  .filter-reset { flex: none; padding: 0.42rem 0.8rem; font-size: 0.85rem; }
+</style>
