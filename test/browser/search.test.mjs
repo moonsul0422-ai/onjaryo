@@ -11,6 +11,16 @@ import assert from 'node:assert/strict';
 const BASE = process.env.BASE_URL || 'http://localhost:4321';
 const EXE = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({ executablePath: EXE });
+/** 외부 폰트 CDN 은 테스트에 필요 없다. 막아 두면 networkidle 이 빨리 끝나고
+ *  결과가 네트워크 상태에 흔들리지 않는다. */
+async function blockExternal(ctx) {
+  await ctx.route('**/*', (route) => {
+    const url = route.request().url();
+    if (url.startsWith(BASE) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
+    return route.abort();
+  });
+}
+
 const errors = [];
 
 async function newPage(ctx) {
@@ -30,6 +40,7 @@ async function newPage(ctx) {
 }
 
 const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+await blockExternal(ctx);
 const page = await newPage(ctx);
 
 // --- 1. 검색창 입력 → 결과

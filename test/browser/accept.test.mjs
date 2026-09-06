@@ -25,6 +25,16 @@ const PAGES = [
 ];
 
 const browser = await chromium.launch({ executablePath: EXE });
+/** 외부 폰트 CDN 은 테스트에 필요 없다. 막아 두면 networkidle 이 빨리 끝나고
+ *  결과가 네트워크 상태에 흔들리지 않는다. */
+async function blockExternal(ctx) {
+  await ctx.route('**/*', (route) => {
+    const url = route.request().url();
+    if (url.startsWith(BASE) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
+    return route.abort();
+  });
+}
+
 const fails = [];
 const check = (name, cond, detail = '') => {
   if (cond) return;
@@ -34,6 +44,7 @@ const check = (name, cond, detail = '') => {
 /* ---- 1. 자바스크립트를 끈 상태 ---- */
 {
   const ctx = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1100, height: 900 } });
+  await blockExternal(ctx);
   const page = await ctx.newPage();
   for (const [name, path] of PAGES) {
     await page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
@@ -69,6 +80,7 @@ const check = (name, cond, detail = '') => {
 /* ---- 2. 360px 가로 스크롤 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2 });
+  await blockExternal(ctx);
   const page = await ctx.newPage();
   for (const [name, path] of PAGES) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' });
@@ -103,6 +115,7 @@ const check = (name, cond, detail = '') => {
 /* ---- 3. 키보드 포커스가 항상 보인다 ---- */
 {
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  await blockExternal(ctx);
   const page = await ctx.newPage();
   for (const [name, path] of [PAGES[0], PAGES[1], PAGES[6]]) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' });
