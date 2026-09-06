@@ -1,0 +1,35 @@
+name: monthly link check
+
+# 기관 사이트는 개편이 잦아 원문 링크가 조용히 죽는다.
+# 한 달에 한 번 전부 훑고, 끊긴 링크가 있으면 워크플로를 실패시켜 알린다.
+
+on:
+  schedule:
+    - cron: '0 21 1 * *' # 매월 2일 06:00 KST
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 시트에서 자료 목록 가져오기
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          SHEET_RESOURCES_GID: ${{ secrets.SHEET_RESOURCES_GID }}
+          SHEET_ORGS_GID: ${{ secrets.SHEET_ORGS_GID }}
+        run: npm run sync
+      - name: 링크 점검
+        run: npm run check-links -- --fail-on-broken
+      - name: 점검 결과 저장
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-check
+          path: reports/link-check.json
+          retention-days: 90

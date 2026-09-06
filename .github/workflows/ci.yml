@@ -1,0 +1,22 @@
+name: build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # SHEET_ID 를 주지 않으면 scripts/seed/*.csv 로 빌드한다.
+      # PR 이 시트 상태에 흔들리지 않게 일부러 시드로 돌린다.
+      - run: npm run sync
+      - run: npm test
+      - run: npx astro build

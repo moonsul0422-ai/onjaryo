@@ -1,0 +1,29 @@
+name: daily rebuild
+
+# 시트 내용이 바뀌어도 정적 사이트는 다시 빌드해야 반영된다.
+# Vercel 배포 훅을 하루 한 번 두드린다.
+#
+# 필요한 secret:
+#   VERCEL_DEPLOY_HOOK_URL — Vercel 프로젝트 Settings → Git → Deploy Hooks 에서 만든 URL
+
+on:
+  schedule:
+    - cron: '20 20 * * *' # 매일 05:20 KST (UTC 20:20)
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vercel 배포 훅 호출
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL secret 이 없습니다." >&2
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
+          echo "HTTP $code"
+          cat /tmp/hook.out
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
