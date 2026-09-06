@@ -10,7 +10,8 @@
     "dev": "npm run sync && astro dev",
     "preview": "astro preview",
     "check-links": "node scripts/check-links.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/browser/search.test.mjs && node test/browser/accept.test.mjs"
   },
   "dependencies": {
     "astro": "^7.3.1"

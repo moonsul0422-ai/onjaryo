@@ -13,6 +13,7 @@ export const organizations = organizationsRaw;
 export const meta = metaRaw;
 
 export const orgByCode = new Map(organizations.map((o) => [o.code, o]));
+export const resourceById = new Map(resources.map((r) => [r.id, r]));
 
 /** 기관 코드 → 자료 목록. 없는 기관은 키 자체가 없다. */
 function groupBy(list, keyFn) {
@@ -54,21 +55,35 @@ export const orgOf = (resource) => orgByCode.get(resource.orgCode) ?? null;
 
 export const orgShortName = (resource) => orgOf(resource)?.shortName ?? resource.orgCode;
 
-/** 같은 기관 또는 같은 영역의 다른 자료. 상세 페이지 하단용. */
+/**
+ * 같은 영역·태그·기관의 다른 자료. 상세 페이지 하단용.
+ *
+ * 전체를 훑지 않고 이미 만들어 둔 그룹에서 후보만 모은다.
+ * 상세 페이지는 자료 수만큼 만들어지므로, 여기서 전체를 훑으면
+ * 자료가 늘 때 빌드 시간이 제곱으로 늘어난다.
+ */
 export function related(resource, limit = 6) {
-  const scored = resources
-    .filter((r) => r.id !== resource.id)
-    .map((r) => {
-      const sharedTopics = r.topics.filter((t) => resource.topics.includes(t)).length;
-      const sharedTags = r.tags.filter((t) => resource.tags.includes(t)).length;
-      const sameOrg = r.orgCode === resource.orgCode ? 1 : 0;
-      const sameLevel = r.schoolLevels.some((l) => resource.schoolLevels.includes(l)) ? 1 : 0;
-      return { r, score: sharedTopics * 3 + sharedTags * 2 + sameOrg + sameLevel };
-    })
-    .filter((x) => x.score > 0);
+  const scores = new Map();
+  const bump = (r, points) => {
+    if (r.id === resource.id) return;
+    scores.set(r.id, (scores.get(r.id) ?? 0) + points);
+  };
 
-  scored.sort((a, b) => b.score - a.score || (b.r.publishedAt || '').localeCompare(a.r.publishedAt || ''));
-  return scored.slice(0, limit).map((x) => x.r);
+  for (const t of resource.topics) for (const r of byTopic.get(t) ?? []) bump(r, 3);
+  for (const t of resource.tags) for (const r of byTag.get(t) ?? []) bump(r, 2);
+  for (const r of byOrg.get(resource.orgCode) ?? []) bump(r, 1);
+  // 학교급은 후보를 넓히지 않고, 이미 걸린 후보의 순위만 올린다.
+  const levels = new Set(resource.schoolLevels);
+  for (const id of scores.keys()) {
+    const r = resourceById.get(id);
+    if (r && r.schoolLevels.some((l) => levels.has(l))) scores.set(id, scores.get(id) + 1);
+  }
+
+  return [...scores.entries()]
+    .map(([id, score]) => ({ r: resourceById.get(id), score }))
+    .sort((a, b) => b.score - a.score || (b.r.publishedAt || '').localeCompare(a.r.publishedAt || '') || a.r.id.localeCompare(b.r.id))
+    .slice(0, limit)
+    .map((x) => x.r);
 }
 
 /** 상위기관까지 거슬러 올라간 경로. [교육부, 한국교육학술정보원] 순. */

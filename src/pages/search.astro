@@ -90,7 +90,6 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
   let loading: Promise<Entry[]> | null = null;
   let hits: Hit[] = [];
   let shown = 0;
-  let lastQuery = '';
 
   const FILTER_KEYS = ['level', 'topic', 'type'] as const;
   type FilterKey = (typeof FILTER_KEYS)[number];
@@ -313,7 +312,6 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
       // 기다리는 동안 질의가 바뀌었을 수 있다. 마지막 값으로 다시 그린다.
       if (input.value.trim() !== query) return;
     }
-    lastQuery = query;
     paint();
   }
 
@@ -365,7 +363,6 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
   } else {
     input.focus();
   }
-  void lastQuery;
 </script>
 
 <style>
