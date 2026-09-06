@@ -5,7 +5,9 @@ import resourcesRaw from '../data/resources.json';
 import organizationsRaw from '../data/organizations.json';
 import metaRaw from '../data/meta.json';
 
-import { byLevelOrder, byTopicOrder, byTypeOrder } from './taxonomy.js';
+import {
+  byGradeOrder, byLevelOrder, bySubjectOrder, byTopicOrder, byTypeOrder,
+} from './taxonomy.js';
 
 /** @type {import('./types.js').Resource[]} */
 export const resources = resourcesRaw;
@@ -29,6 +31,8 @@ function groupBy(list, keyFn) {
   return map;
 }
 
+export const byGrade = groupBy(resources, (r) => r.grades);
+export const bySubject = groupBy(resources, (r) => r.subjects);
 export const byTopic = groupBy(resources, (r) => r.topics);
 export const byLevel = groupBy(resources, (r) => r.schoolLevels);
 export const byOrg = groupBy(resources, (r) => [r.orgCode]);
@@ -36,7 +40,45 @@ export const byTag = groupBy(resources, (r) => r.tags);
 export const byType = groupBy(resources, (r) => (r.resourceType ? [r.resourceType] : []));
 
 /** 자료가 1건 이상인 값만. 빈 페이지를 만들지 않기 위해 getStaticPaths 가 이걸 쓴다. */
+export const usedGrades = [...byGrade.keys()].sort(byGradeOrder);
+export const usedSubjects = [...bySubject.keys()].sort(bySubjectOrder);
 export const usedTopics = [...byTopic.keys()].sort(byTopicOrder);
+
+/**
+ * 학년 × 과목 교차. "초3 수학" 처럼 눌러서 좁혀 들어가는 경로를 만든다.
+ * 실제로 자료가 있는 조합만 키로 들어간다 — 빈 페이지를 만들지 않기 위해.
+ */
+export const byGradeSubject = (() => {
+  const map = new Map();
+  for (const r of resources) {
+    for (const g of r.grades) {
+      for (const sub of r.subjects) {
+        const key = `${g}\u0000${sub}`;
+        const bucket = map.get(key);
+        if (bucket) bucket.push(r);
+        else map.set(key, [r]);
+      }
+    }
+  }
+  return map;
+})();
+
+export const gradeSubjectKey = (grade, subject) => `${grade}\u0000${subject}`;
+
+export const usedGradeSubjects = [...byGradeSubject.keys()]
+  .map((k) => {
+    const [grade, subject] = k.split('\u0000');
+    return { grade, subject, items: byGradeSubject.get(k) };
+  })
+  .sort((a, b) => byGradeOrder(a.grade, b.grade) || bySubjectOrder(a.subject, b.subject));
+
+/** 한 학년에서 실제로 자료가 있는 과목만. 학년 페이지의 다음 클릭지. */
+export const subjectsOfGrade = (grade) =>
+  [...new Set((byGrade.get(grade) ?? []).flatMap((r) => r.subjects))].sort(bySubjectOrder);
+
+/** 한 과목에서 실제로 자료가 있는 학년만. */
+export const gradesOfSubject = (subject) =>
+  [...new Set((bySubject.get(subject) ?? []).flatMap((r) => r.grades))].sort(byGradeOrder);
 export const usedLevels = [...byLevel.keys()].sort(byLevelOrder);
 export const usedTags = [...byTag.keys()].sort((a, b) => byTag.get(b).length - byTag.get(a).length || a.localeCompare(b, 'ko'));
 export const usedOrgCodes = [...byOrg.keys()].filter((c) => orgByCode.has(c)).sort((a, b) => byOrg.get(b).length - byOrg.get(a).length || a.localeCompare(b));

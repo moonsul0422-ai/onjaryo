@@ -1,0 +1,101 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import {
+  bySubject, byGradeSubject, gradeSubjectKey, gradesOfSubject, orgByCode, usedSubjects,
+} from '../../lib/data.js';
+import { GRADE_LABELS, SUBJECT_DESCRIPTIONS, byTopicOrder } from '../../lib/taxonomy.js';
+import { gradeSubjectUrl, subjectUrl, topicUrl } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  return usedSubjects.map((subject) => ({
+    params: { subject },
+    props: { subject, items: bySubject.get(subject) },
+  }));
+}
+
+const { subject, items } = Astro.props;
+const description = SUBJECT_DESCRIPTIONS[subject];
+const grades = gradesOfSubject(subject);
+const topics = [...new Set(items.flatMap((r: any) => r.topics))].sort(byTopicOrder);
+
+const metaDescription = `${subject} 교육자료 ${items.length}건. ${description}`.slice(0, 155);
+---
+
+<Base title={`${subject} 교육자료`} description={metaDescription} canonical={subjectUrl(subject)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      <li aria-current="page">{subject}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{subject}</h1>
+    <p class="lede">{description}</p>
+    <p class="count">자료 {items.length}건 · 학년 {grades.length}개</p>
+  </header>
+
+  {grades.length > 0 && (
+    <nav class="picknext" aria-labelledby="pick-grade">
+      <h2 id="pick-grade" class="picknext-h">학년을 고르면 더 좁혀집니다</h2>
+      <ul class="chips">
+        {grades.map((g: string) => (
+          <li>
+            <a class="chip chip-go" href={gradeSubjectUrl(g, subject)}>
+              {GRADE_LABELS[g] ?? g}
+              <span class="n">{byGradeSubject.get(gradeSubjectKey(g, subject)).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">{subject} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  {topics.length > 0 && (
+    <nav class="section" aria-label="주제로 좁히기">
+      <h2 class="picknext-h">주제로 보기</h2>
+      <ul class="chips">
+        {topics.map((t: string) => (
+          <li><a class="chip chip-sm" href={topicUrl(t)}>{t}</a></li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <nav class="section" aria-label="다른 과목 보기">
+    <h2 class="picknext-h">다른 과목 보기</h2>
+    <ul class="chips">
+      {usedSubjects.map((s: string) => (
+        <li>
+          <a class="chip" href={subjectUrl(s)} aria-current={s === subject ? 'page' : undefined}>
+            {s}<span class="n">{bySubject.get(s).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</Base>
+
+<style>
+  .count {
+    margin: 0.6rem 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .picknext { margin-bottom: 1.3rem; }
+  .picknext-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+</style>

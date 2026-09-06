@@ -2,7 +2,9 @@
 // 목록 페이지 네 곳 + 홈 + 검색 결과에서 공유하는 카드.
 // 검색 결과는 클라이언트에서 같은 클래스 이름으로 compact 형태를 다시 그린다.
 // 마크업을 바꾸면 src/components/SearchResults.astro 의 렌더 함수도 같이 고쳐야 한다.
-import { formatDateShort, resourceUrl, orgUrl, topicUrl } from '../lib/site.js';
+import {
+  formatDateShort, formatGradeRange, resourceUrl, orgUrl, subjectUrl, topicUrl,
+} from '../lib/site.js';
 
 interface Props {
   resource: any;
@@ -14,6 +16,7 @@ interface Props {
 const { resource, org = null, compact = false, headingLevel = 3 } = Astro.props;
 const Heading = `h${headingLevel}`;
 const orgLabel = org?.shortName ?? resource.orgCode;
+const gradeLabel = formatGradeRange(resource.grades);
 ---
 
 <article class:list={['rcard', compact && 'rcard-compact']}>
@@ -35,6 +38,12 @@ const orgLabel = org?.shortName ?? resource.orgCode;
         <time datetime={resource.publishedAt}>{formatDateShort(resource.publishedAt)}</time>
       </>
     )}
+    {gradeLabel && (
+      <>
+        <span aria-hidden="true">·</span>
+        <span class="rcard-grade">{gradeLabel}</span>
+      </>
+    )}
     {resource.resourceType && (
       <>
         <span aria-hidden="true">·</span>
@@ -43,8 +52,11 @@ const orgLabel = org?.shortName ?? resource.orgCode;
     )}
   </p>
 
-  {resource.topics.length > 0 && (
+  {(resource.subjects.length > 0 || resource.topics.length > 0) && (
     <ul class="rcard-topics">
+      {resource.subjects.map((s: string) => (
+        <li><a class="chip chip-sm chip-subject" href={subjectUrl(s)}>{s}</a></li>
+      ))}
       {resource.topics.map((t: string) => (
         <li><a class="chip chip-sm" href={topicUrl(t)}>{t}</a></li>
       ))}
@@ -116,6 +128,12 @@ const orgLabel = org?.shortName ?? resource.orgCode;
     margin: 0.6rem 0 0;
   }
   .chip-sm { padding: 0.14rem 0.5rem; font-size: 0.78rem; }
+  .rcard-meta .rcard-grade { color: var(--ink); font-weight: 600; }
+  .chip-subject {
+    border-color: var(--go);
+    color: var(--go-dark);
+    font-weight: 600;
+  }
 
   .rcard-compact { padding: 0.8rem 0.95rem; }
   .rcard-compact .rcard-title { font-size: 1.02rem; }

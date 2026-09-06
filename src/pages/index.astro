@@ -2,11 +2,12 @@
 import Base from '../layouts/Base.astro';
 import SearchBox from '../components/SearchBox.astro';
 import ResourceCard from '../components/ResourceCard.astro';
+import GradeNav from '../components/GradeNav.astro';
 import TopicNav from '../components/TopicNav.astro';
 import {
-  byLevel, byOrg, meta, orgByCode, recent, usedLevels, usedOrgCodes,
+  byOrg, bySubject, meta, orgByCode, recent, usedOrgCodes, usedSubjects,
 } from '../lib/data.js';
-import { SITE_DESCRIPTION, SITE_NAME, formatDate, levelUrl, orgUrl } from '../lib/site.js';
+import { SITE_DESCRIPTION, SITE_NAME, formatDate, orgUrl, subjectUrl } from '../lib/site.js';
 
 const latest = recent(10);
 const topOrgs = usedOrgCodes.slice(0, 8);
@@ -14,33 +15,31 @@ const topOrgs = usedOrgCodes.slice(0, 8);
 
 <Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
   <section class="hero">
-    <h1>필요한 교육자료, 여기서 한 번에</h1>
+    <h1>몇 학년, 무슨 과목인지만 고르세요</h1>
     <p class="hero-lede">
-      시·도교육청과 산하기관이 공개한 자료를 영역과 학교급으로 정리했습니다.
-      제목·요약·태그·기관명을 한꺼번에 찾습니다.
+      전국 교육청이 공개한 수업자료를 학년과 과목으로 정리했습니다.
+      찾은 자료는 <b>발행한 교육청 사이트에서 그대로</b> 내려받습니다.
     </p>
-    <SearchBox id="q-home" size="lg" label="자료 검색" />
-    <p class="hero-hint">
-      띄어쓰기는 신경 쓰지 않아도 됩니다. <b>안전 교육</b>과 <b>안전교육</b>이 같은 결과를 냅니다.
-    </p>
+    <SearchBox id="q-home" size="lg" label="자료 검색" placeholder="예: 초3 분수, 안전교육 활동지" />
   </section>
 
-  <section class="section" aria-labelledby="topics-h">
+  <section class="section pick" aria-labelledby="grade-h">
     <div class="section-head">
-      <h2 id="topics-h">영역으로 찾기</h2>
-      <a href="/search">검색으로 찾기</a>
+      <h2 id="grade-h">학년으로 찾기</h2>
     </div>
-    <TopicNav />
+    <GradeNav big />
   </section>
 
-  <section class="section" aria-labelledby="levels-h">
+  <section class="section pick" aria-labelledby="subject-h">
     <div class="section-head">
-      <h2 id="levels-h">학교급으로 찾기</h2>
+      <h2 id="subject-h">과목으로 찾기</h2>
     </div>
     <ul class="chips">
-      {usedLevels.map((l: string) => (
+      {usedSubjects.map((s: string) => (
         <li>
-          <a class="chip" href={levelUrl(l)}>{l}<span class="n">{byLevel.get(l).length}</span></a>
+          <a class="chip chip-big" href={subjectUrl(s)}>
+            {s}<span class="n">{bySubject.get(s).length}</span>
+          </a>
         </li>
       ))}
     </ul>
@@ -56,6 +55,16 @@ const topOrgs = usedOrgCodes.slice(0, 8);
         <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
       ))}
     </ul>
+  </section>
+
+  <section class="section" aria-labelledby="topics-h">
+    <div class="section-head">
+      <h2 id="topics-h">주제로 찾기</h2>
+    </div>
+    <p class="section-note">
+      교과로 묶이지 않는 자료 — 안전교육, 학급운영, 학부모 안내 같은 것들은 여기 모입니다.
+    </p>
+    <TopicNav />
   </section>
 
   <section class="section" aria-labelledby="orgs-h">
@@ -111,12 +120,20 @@ const topOrgs = usedOrgCodes.slice(0, 8);
     font-size: 1.02rem;
     margin-bottom: 1.1rem;
   }
-  .hero-hint {
-    margin: 0.55rem 0 0;
-    font-size: 0.84rem;
-    color: var(--muted);
+  .hero-lede b { color: var(--ink); font-weight: 600; }
+
+  .pick {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem 1.1rem;
   }
-  .hero-hint b { color: var(--ink); font-weight: 600; }
+  .pick .section-head { margin-bottom: 0.8rem; }
+  .section-note {
+    font-size: 0.86rem;
+    color: var(--muted);
+    margin: -0.3rem 0 0.7rem;
+  }
 
   .statlist {
     display: flex;

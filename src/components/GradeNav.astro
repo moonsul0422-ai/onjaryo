@@ -1,0 +1,94 @@
+---
+// 1차 탐색 축. 홈 첫 화면과 학년 페이지 하단에서 쓴다.
+// 자료가 0건인 학년은 만들지 않는다.
+import { byGrade, usedGrades } from '../lib/data.js';
+import { GRADE_LABELS, GRADE_TO_LEVEL } from '../lib/taxonomy.js';
+import { gradeUrl } from '../lib/site.js';
+
+interface Props {
+  current?: string | null;
+  heading?: string | null;
+  headingId?: string;
+  big?: boolean;
+}
+
+const { current = null, heading = null, headingId = 'gradenav-h', big = false } = Astro.props;
+
+// 학교급끼리 묶어서 줄을 나눈다. 13개를 한 줄에 늘어놓으면 눈이 갈 곳을 잃는다.
+const LEVEL_ORDER = ['유아', '초등', '중학', '고교'];
+const groups = LEVEL_ORDER
+  .map((level) => ({
+    level,
+    grades: usedGrades.filter((g: string) => GRADE_TO_LEVEL[g] === level),
+  }))
+  .filter((g) => g.grades.length > 0);
+---
+
+<nav
+  class:list={['gradenav', big && 'gradenav-big']}
+  aria-labelledby={heading ? headingId : undefined}
+  aria-label={heading ? undefined : '학년 바로가기'}
+>
+  {heading && <h2 id={headingId} class="gradenav-h">{heading}</h2>}
+  <ul class="gradegroups">
+    {groups.map((group) => (
+      <li class="gradegroup">
+        <span class="gradegroup-label">{group.level}</span>
+        <ul class="chips">
+          {group.grades.map((g: string) => (
+            <li>
+              <a
+                class:list={['chip', big && 'chip-big']}
+                href={gradeUrl(g)}
+                aria-current={g === current ? 'page' : undefined}
+              >
+                {big ? (GRADE_LABELS[g] ?? g).replace(/^(초등|중학|고등) /, '') : (GRADE_LABELS[g] ?? g)}
+                <span class="n">{byGrade.get(g).length}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .gradenav-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+  .gradegroups {
+    list-style: none;
+    display: grid;
+    gap: 0.6rem;
+    padding: 0;
+    margin: 0;
+  }
+  .gradegroup {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    align-items: start;
+    gap: 0.5rem;
+  }
+  .gradegroup-label {
+    font-size: 0.82rem;
+    color: var(--muted);
+    padding-top: 0.35rem;
+    white-space: nowrap;
+  }
+
+  .gradenav-big .gradegroup-label { padding-top: 0.5rem; font-weight: 600; color: var(--ink); }
+  .gradenav-big :global(.chip-big) {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.98rem;
+    font-weight: 600;
+  }
+
+  @media (max-width: 26rem) {
+    .gradegroup { grid-template-columns: 2.6rem 1fr; gap: 0.4rem; }
+    .gradegroup-label { font-size: 0.76rem; }
+  }
+</style>

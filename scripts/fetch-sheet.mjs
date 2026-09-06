@@ -17,8 +17,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  isAudience, isLevel, isLicense, isTopic, isType,
-  byLevelOrder, byTopicOrder,
+  isAudience, isGrade, isLevel, isLicense, isSubject, isTopic, isType,
+  byGradeOrder, byLevelOrder, bySubjectOrder, byTopicOrder,
+  GRADE_TO_LEVEL,
 } from '../src/lib/taxonomy.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -97,6 +98,28 @@ function splitListKeepDot(v) {
     .split(/[,;|\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/**
+ * 학년 표기를 상수 값으로 맞춘다.
+ * "초등 3학년", "3학년", "초3", "초등3" 이 모두 "초3" 이 되게.
+ * 학교급이 없는 "3학년" 은 초등으로 본다 — 시트에서 가장 흔한 생략이다.
+ */
+export function normalizeGrade(v) {
+  const s = clean(v).replace(/\s+/g, '');
+  if (!s) return null;
+  if (/^(유아|유치원)$/.test(s)) return '유아';
+  const m = /^(초등|초|중학|중|고등|고교|고)?(\d)(학년)?$/.exec(s);
+  if (!m) return null;
+  const [, levelPart, num] = m;
+  const n = Number(num);
+  let prefix;
+  if (!levelPart || /^(초등|초)$/.test(levelPart)) prefix = '초';
+  else if (/^(중학|중)$/.test(levelPart)) prefix = '중';
+  else prefix = '고';
+  if (prefix === '초' && (n < 1 || n > 6)) return null;
+  if (prefix !== '초' && (n < 1 || n > 3)) return null;
+  return `${prefix}${n}`;
 }
 
 /** 다양한 날짜 표기를 ISO(YYYY-MM-DD)로. 못 읽으면 null. */
@@ -209,11 +232,37 @@ function normalizeResource(rec, index, orgIndex) {
   });
   if (topics.length === 0) { warn(`${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`); return null; }
 
-  const schoolLevels = splitList(raw.schoolLevels).filter((v) => {
+  const grades = [...new Set(
+    splitList(raw.grades)
+      .map((v) => {
+        const g = normalizeGrade(v);
+        if (g && isGrade(g)) return g;
+        warn(`${rowRef} (${id}): 읽을 수 없는 학년 "${v}" — 무시합니다`);
+        return null;
+      })
+      .filter(Boolean)
+  )].sort(byGradeOrder);
+
+  const subjects = [...new Set(splitListKeepDot(raw.subjects).filter((v) => {
+    if (isSubject(v)) return true;
+    warn(`${rowRef} (${id}): 정의되지 않은 교과 "${v}" — 무시합니다`);
+    return false;
+  }))].sort(bySubjectOrder);
+
+  let schoolLevels = splitList(raw.schoolLevels).filter((v) => {
     if (isLevel(v)) return true;
     warn(`${rowRef} (${id}): 정의되지 않은 학교급 "${v}" — 무시합니다`);
     return false;
   });
+  // 학년을 적었으면 학교급은 손으로 적지 않아도 된다. 여기서 유도한다.
+  if (grades.length > 0) {
+    const derived = [...new Set(grades.map((g) => GRADE_TO_LEVEL[g]).filter(Boolean))];
+    schoolLevels = [...new Set([...schoolLevels, ...derived])];
+  }
+  if (schoolLevels.length === 0) {
+    warn(`${rowRef} (${id}): 학년도 학교급도 없습니다 — "전체"로 둡니다`);
+    schoolLevels = ['전체'];
+  }
   const audiences = splitList(raw.audiences).filter((v) => {
     if (isAudience(v)) return true;
     warn(`${rowRef} (${id}): 정의되지 않은 대상 "${v}" — 무시합니다`);
@@ -245,8 +294,8 @@ function normalizeResource(rec, index, orgIndex) {
     year: publishedAt ? Number(publishedAt.slice(0, 4)) : null,
     audiences,
     schoolLevels: schoolLevels.sort(byLevelOrder),
-    grades: splitList(raw.grades),
-    subjects: splitListKeepDot(raw.subjects),
+    grades,
+    subjects,
     topics: [...new Set(topics)].sort(byTopicOrder),
     resourceType,
     fileFormats: normalizeFormats(raw.fileFormats),

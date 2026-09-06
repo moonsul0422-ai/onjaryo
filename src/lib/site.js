@@ -26,6 +26,10 @@ export const NAV = [
 ];
 
 /** 분류 URL. 한글 값을 encodeURIComponent 로 인코딩해 그대로 쓴다. */
+export const gradeUrl = (g) => `/grade/${encodeURIComponent(g)}/`;
+export const subjectUrl = (s) => `/subject/${encodeURIComponent(s)}/`;
+export const gradeSubjectUrl = (g, s) =>
+  `/grade/${encodeURIComponent(g)}/${encodeURIComponent(s)}/`;
 export const topicUrl = (t) => `/topic/${encodeURIComponent(t)}/`;
 export const levelUrl = (l) => `/level/${encodeURIComponent(l)}/`;
 export const tagUrl = (t) => `/tag/${encodeURIComponent(t)}/`;
@@ -64,3 +68,45 @@ export function particle(word, withBatchim, withoutBatchim) {
 /** "교육부" → "교육부는", "서울교육청" → "서울교육청은" */
 export const withEun = (w) => `${w}${particle(w, '은', '는')}`;
 export const withI = (w) => `${w}${particle(w, '이', '가')}`;
+
+/**
+ * 학년 배열을 짧은 표기로. 카드 한 줄에 들어가야 해서 칩 대신 글자로 쓴다.
+ *   ['초3','초4']                     → '초3~4'
+ *   ['초1'..'초6']                     → '초등 전체'
+ *   ['초5','초6','중1']                → '초5~중1'
+ *   ['중1','중3']                      → '중1·중3'
+ */
+const GRADE_SEQ = [
+  '유아',
+  '초1', '초2', '초3', '초4', '초5', '초6',
+  '중1', '중2', '중3',
+  '고1', '고2', '고3',
+];
+const LEVEL_FULL = {
+  '초등': ['초1', '초2', '초3', '초4', '초5', '초6'],
+  '중학': ['중1', '중2', '중3'],
+  '고교': ['고1', '고2', '고3'],
+};
+
+export function formatGradeRange(grades) {
+  if (!grades || grades.length === 0) return null;
+  const rank = new Map(GRADE_SEQ.map((g, i) => [g, i]));
+  const sorted = [...new Set(grades)].filter((g) => rank.has(g)).sort((a, b) => rank.get(a) - rank.get(b));
+  if (sorted.length === 0) return null;
+  if (sorted.length === 1) return sorted[0];
+
+  // 한 학교급을 통째로 덮으면 그렇게 말한다.
+  for (const [level, members] of Object.entries(LEVEL_FULL)) {
+    if (members.length === sorted.length && members.every((m) => sorted.includes(m))) {
+      return `${level} 전체`;
+    }
+  }
+
+  const contiguous = sorted.every((g, i) => i === 0 || rank.get(g) === rank.get(sorted[i - 1]) + 1);
+  if (!contiguous) return sorted.join('·');
+
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  // 같은 학교급이면 뒤쪽 접두사를 뗀다. 초3~4 처럼.
+  return first[0] === last[0] ? `${first}~${last.slice(1)}` : `${first}~${last}`;
+}

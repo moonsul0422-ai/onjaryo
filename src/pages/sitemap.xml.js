@@ -2,10 +2,13 @@
 // 페이지별 날짜를 우리가 알아야 하는데, 그건 데이터 쪽에만 있다.
 
 import {
-  byLevel, byOrg, byTag, byTopic, meta,
-  usedLevels, usedOrgCodes, usedTags, usedTopics,
+  byGrade, byLevel, byOrg, bySubject, byTag, byTopic, meta,
+  usedGrades, usedGradeSubjects, usedLevels, usedOrgCodes, usedSubjects,
+  usedTags, usedTopics,
 } from '../lib/data.js';
-import { levelUrl, orgUrl, resourceUrl, tagUrl, topicUrl } from '../lib/site.js';
+import {
+  gradeSubjectUrl, gradeUrl, levelUrl, orgUrl, resourceUrl, subjectUrl, tagUrl, topicUrl,
+} from '../lib/site.js';
 import { resources } from '../lib/data.js';
 
 /** 목록의 자료 중 가장 최근 발행일. 분류 페이지의 lastmod 로 쓴다. */
@@ -27,6 +30,16 @@ function buildEntries(siteUrl) {
 
   for (const r of resources) {
     add(resourceUrl(r.id), r.publishedAt, 'yearly', '0.8');
+  }
+  // 1차 탐색 축이라 우선순위를 높게 준다.
+  for (const g of usedGrades) {
+    add(gradeUrl(g), newestIn(byGrade.get(g)), 'weekly', '0.9');
+  }
+  for (const s of usedSubjects) {
+    add(subjectUrl(s), newestIn(bySubject.get(s)), 'weekly', '0.9');
+  }
+  for (const { grade, subject, items } of usedGradeSubjects) {
+    add(gradeSubjectUrl(grade, subject), newestIn(items), 'weekly', '0.8');
   }
   for (const t of usedTopics) {
     add(topicUrl(t), newestIn(byTopic.get(t)), 'weekly', '0.7');
