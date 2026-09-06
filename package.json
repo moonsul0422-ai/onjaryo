@@ -1,0 +1,17 @@
+{
+  "name": "onjaryo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "교육자료 아카이브 — 시·도교육청 공개 교육자료를 한곳에서 찾는 정적 사이트",
+  "scripts": {
+    "sync": "node scripts/fetch-sheet.mjs",
+    "build": "npm run sync && astro build",
+    "dev": "npm run sync && astro dev",
+    "preview": "astro preview",
+    "check-links": "node scripts/check-links.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.3.1"
+  }
+}

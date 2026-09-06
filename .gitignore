@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.astro/
+.vercel/
+.env
+.env.*
+!.env.example
+.DS_Store
+npm-debug.log*
+
+# 빌드 산출물 — 시트에서 매번 생성한다
+src/data/
+public/search-index.json
+reports/

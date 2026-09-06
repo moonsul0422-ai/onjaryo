@@ -1,0 +1,16 @@
+code,name,shortName,region,orgType,parent,homepage
+moe,교육부,교육부,전국,중앙행정기관,,https://www.moe.go.kr
+kice,한국교육과정평가원,평가원,전국,연구기관,moe,https://www.kice.re.kr
+keris,한국교육학술정보원,KERIS,전국,연구기관,moe,https://www.keris.or.kr
+kedi,한국교육개발원,교육개발원,전국,연구기관,moe,https://www.kedi.re.kr
+kofac,한국과학창의재단,창의재단,전국,공공기관,moe,https://www.kofac.re.kr
+sen,서울특별시교육청,서울교육청,서울,시도교육청,,https://www.sen.go.kr
+serii,서울특별시교육청교육연구정보원,서울교육연구정보원,서울,교육청 산하기관,sen,https://www.serii.re.kr
+goe,경기도교육청,경기교육청,경기,시도교육청,,https://www.goe.go.kr
+pen,부산광역시교육청,부산교육청,부산,시도교육청,,https://www.pen.go.kr
+ice,인천광역시교육청,인천교육청,인천,시도교육청,,https://www.ice.go.kr
+dge,대구광역시교육청,대구교육청,대구,시도교육청,,https://www.dge.go.kr
+gen,광주광역시교육청,광주교육청,광주,시도교육청,,https://www.gen.go.kr
+cbe,충청북도교육청,충북교육청,충북,시도교육청,,https://www.cbe.go.kr
+jje,제주특별자치도교육청,제주교육청,제주,시도교육청,,https://www.jje.go.kr
+gwe,강원특별자치도교육청,강원교육청,강원,시도교육청,,https://www.gwe.go.kr
