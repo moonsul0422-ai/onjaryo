@@ -35,6 +35,31 @@ const n1 = await page.locator('#result-list > li').count();
 console.log('안전교육 결과', n1, '건 ·', await page.locator('#result-status').textContent());
 assert.ok(n1 > 0);
 
+// 결과 카드에 스타일이 실제로 먹었는가.
+// 검색 결과는 ResourceCard 컴포넌트를 거치지 않고 클라이언트에서 그린다.
+// 카드 CSS 가 컴포넌트 파일에 묶여 있으면 이 페이지에는 딸려 오지 않는다(한 번 그랬다).
+const styled = await page.evaluate(() => {
+  const list = document.getElementById('result-list');
+  const card = list?.querySelector('.rcard');
+  const chip = list?.querySelector('.chip');
+  if (!card || !chip) return null;
+  const cs = getComputedStyle(card);
+  return {
+    listStyle: getComputedStyle(list).listStyleType,
+    display: getComputedStyle(list).display,
+    borderWidth: parseFloat(cs.borderTopWidth) || 0,
+    radius: parseFloat(cs.borderTopLeftRadius) || 0,
+    chipRadius: parseFloat(getComputedStyle(chip).borderTopLeftRadius) || 0,
+  };
+});
+assert.ok(styled, '결과 카드와 칩이 그려진다');
+assert.equal(styled.listStyle, 'none', '목록 글머리표가 없다');
+assert.equal(styled.display, 'grid', '.rlist 스타일이 먹었다');
+assert.ok(styled.borderWidth >= 1, `카드 테두리가 있다 (${styled.borderWidth}px)`);
+assert.ok(styled.radius >= 4, `카드 모서리가 둥글다 (${styled.radius}px)`);
+assert.ok(styled.chipRadius >= 8, `칩이 알약 모양이다 (${styled.chipRadius}px)`);
+console.log('결과 카드 스타일 적용 OK');
+
 // URL 에 반영되는가
 await page.waitForFunction(() => new URL(location.href).searchParams.get('q') === '안전교육');
 console.log('URL:', decodeURIComponent(new URL(page.url()).search));

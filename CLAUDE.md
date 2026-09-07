@@ -279,6 +279,10 @@ URL에는 `encodeURIComponent`로 인코딩한 한글을 그대로 쓴다. 로�
 목록 페이지와 홈에서 재사용되고, 검색 결과는 같은 클래스로 `compact` 형태를 다시 그린다.
 마크업을 바꾸면 `search.astro`의 렌더 함수도 같이 고친다.
 
+**카드 CSS는 `Base.astro`의 전역 블록에 둔다.** 컴포넌트 파일에 넣으면 그 컴포넌트를
+import 하는 페이지에만 딸려 간다. `search.astro`는 카드를 클라이언트에서 그리므로
+컴포넌트를 import 하지 않고, 그래서 스타일이 통째로 빠진다.
+
 **`Base.astro`** — props: `title`, `description`, `canonical`, `ogType?`
 CSS 변수는 여기 한 번만 정의한다:
 ```css

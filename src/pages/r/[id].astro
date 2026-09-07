@@ -3,8 +3,10 @@ import Base from '../../layouts/Base.astro';
 import ResourceCard from '../../components/ResourceCard.astro';
 import { resources, orgByCode, orgLineage, related } from '../../lib/data.js';
 import {
-  SITE_NAME, absolute, formatDate, levelUrl, orgUrl, resourceUrl, tagUrl, topicUrl,
+  SITE_NAME, absolute, formatDate, gradeSubjectUrl, gradeUrl, levelUrl, orgUrl, resourceUrl,
+  subjectUrl, tagUrl, topicUrl,
 } from '../../lib/site.js';
+import { GRADE_LABELS } from '../../lib/taxonomy.js';
 
 export function getStaticPaths() {
   return resources.map((resource) => ({
@@ -25,12 +27,17 @@ const facts = [
   { label: '발행일', value: formatDate(resource.publishedAt) },
   { label: '자료 유형', value: resource.resourceType },
   { label: '파일 형식', value: resource.fileFormats.join(', ') || null },
+  { label: '학년', html: 'grades' },
+  { label: '교과', html: 'subjects' },
   { label: '학교급', html: 'levels' },
   { label: '대상', value: resource.audiences.join(', ') || null },
-  { label: '학년', value: resource.grades.join(', ') || null },
-  { label: '교과', value: resource.subjects.join(', ') || null },
   { label: '이용 조건', value: resource.license },
-].filter((f) => f.html || f.value);
+].filter((f) => {
+  if (f.html === 'grades') return resource.grades.length > 0;
+  if (f.html === 'subjects') return resource.subjects.length > 0;
+  if (f.html === 'levels') return resource.schoolLevels.length > 0;
+  return Boolean(f.html || f.value);
+});
 
 const description = resource.summary.length > 155
   ? `${resource.summary.slice(0, 152)}…`
@@ -155,6 +162,20 @@ const jsonLd = {
               </>
             )}
             {f.html === 'org' && !org && <span>{resource.orgCode}</span>}
+            {f.html === 'grades' && (
+              <ul class="inline-links">
+                {resource.grades.map((g: string) => (
+                  <li><a href={gradeUrl(g)}>{GRADE_LABELS[g] ?? g}</a></li>
+                ))}
+              </ul>
+            )}
+            {f.html === 'subjects' && (
+              <ul class="inline-links">
+                {resource.subjects.map((sub: string) => (
+                  <li><a href={subjectUrl(sub)}>{sub}</a></li>
+                ))}
+              </ul>
+            )}
             {f.html === 'levels' && (
               <ul class="inline-links">
                 {resource.schoolLevels.map((l: string) => (
@@ -179,6 +200,19 @@ const jsonLd = {
         ))}
       </ul>
     </div>
+
+    {resource.grades.length > 0 && resource.subjects.length > 0 && (
+      <p class="detail-cross">
+        비슷한 자료 더 보기:
+        {resource.grades.slice(0, 2).flatMap((g: string) =>
+          resource.subjects.slice(0, 2).map((sub: string) => (
+            <a class="chip chip-sm" href={gradeSubjectUrl(g, sub)}>
+              {GRADE_LABELS[g] ?? g} {sub}
+            </a>
+          ))
+        )}
+      </p>
+    )}
 
     <p class="detail-source">
       원문 주소: <a href={resource.sourceUrl} rel="noopener nofollow" class="src-url">{resource.sourceUrl}</a>
@@ -270,6 +304,15 @@ const jsonLd = {
   }
 
   .detail-tax { margin-bottom: 1.1rem; }
+  .detail-cross {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 1.1rem;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
   .chip-tag { font-size: 0.8rem; color: var(--muted); }
 
   .detail-source {

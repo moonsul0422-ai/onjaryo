@@ -64,77 +64,8 @@ const gradeLabel = formatGradeRange(resource.grades);
   )}
 </article>
 
-<style is:global>
-  .rlist {
-    list-style: none;
-    display: grid;
-    gap: 0.85rem;
-    padding: 0;
-    margin: 0;
-  }
-
-  .rcard {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 1rem 1.1rem;
-  }
-  .rcard:hover { border-color: #c9cdbf; }
-
-  .rcard-title {
-    font-family: var(--serif);
-    font-size: 1.1rem;
-    font-weight: 700;
-    line-height: 1.45;
-    margin: 0 0 0.35rem;
-  }
-  .rcard-title a {
-    color: var(--ink);
-    text-decoration: none;
-  }
-  .rcard-title a:hover { color: var(--go-dark); text-decoration: underline; }
-
-  .rcard-sum {
-    margin: 0 0 0.5rem;
-    color: var(--muted);
-    font-size: 0.92rem;
-    line-height: 1.6;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .rcard-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.32rem;
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-  }
-  .rcard-meta .rcard-org { color: var(--go-dark); font-weight: 600; text-decoration: none; }
-  .rcard-meta a.rcard-org:hover { text-decoration: underline; }
-
-  .rcard-topics {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    padding: 0;
-    margin: 0.6rem 0 0;
-  }
-  .chip-sm { padding: 0.14rem 0.5rem; font-size: 0.78rem; }
-  .rcard-meta .rcard-grade { color: var(--ink); font-weight: 600; }
-  .chip-subject {
-    border-color: var(--go);
-    color: var(--go-dark);
-    font-weight: 600;
-  }
-
-  .rcard-compact { padding: 0.8rem 0.95rem; }
-  .rcard-compact .rcard-title { font-size: 1.02rem; }
-</style>
+<!--
+  카드 스타일은 Base.astro 의 전역 블록에 있다.
+  검색 결과는 이 컴포넌트를 거치지 않고 클라이언트에서 같은 마크업을 다시 그리는데,
+  스타일이 이 파일에 묶여 있으면 search.astro 에는 딸려 가지 않는다.
+-->
