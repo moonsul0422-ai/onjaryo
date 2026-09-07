@@ -159,6 +159,33 @@ function normalizeFormats(v) {
     .filter(Boolean);
 }
 
+const COVER_RE = /^[A-Za-z0-9][\w.-]*\.(?:jpe?g|png|webp|avif)$/i;
+
+/**
+ * 표지 이미지. 시트에는 파일 이름만 적고 파일은 public/covers/ 에 둔다.
+ *
+ * 외부 주소를 막는 이유가 두 가지다. 남의 서버 이미지는 그쪽이 파일을 옮기는
+ * 순간 깨지고, 트래픽도 그쪽에 떠넘기게 된다. 경로 구분자를 막는 이유는
+ * 시트 값이 그대로 URL 이 되기 때문이다.
+ */
+function normalizeCover(v, ctx = '') {
+  const s = clean(v);
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) {
+    warn(`${ctx}: 표지는 파일 이름만 적습니다. 외부 주소는 쓰지 않습니다 — "${s}"`);
+    return null;
+  }
+  if (!COVER_RE.test(s)) {
+    warn(`${ctx}: 표지 파일 이름이 올바르지 않습니다 (jpg/png/webp/avif) — "${s}"`);
+    return null;
+  }
+  if (!existsSync(resolve(ROOT, 'public/covers', s))) {
+    warn(`${ctx}: public/covers/${s} 파일이 없습니다 — 기본 카드로 둡니다`);
+    return null;
+  }
+  return `/covers/${s}`;
+}
+
 const FIELD_ALIASES = {
   id: ['id', '아이디', '식별자'],
   title: ['title', '제목', '자료명'],
@@ -176,6 +203,7 @@ const FIELD_ALIASES = {
   fileFormats: ['fileformats', 'formats', '파일형식', '형식'],
   license: ['license', '이용조건', '라이선스', '공공누리'],
   tags: ['tags', '태그'],
+  coverImage: ['coverimage', 'cover', '표지', '표지이미지', '표지파일'],
   linkCheckedAt: ['linkcheckedat', '링크점검일'],
   status: ['status', '상태', '공개'],
 };
@@ -302,6 +330,7 @@ function normalizeResource(rec, index, orgIndex) {
     fileFormats: normalizeFormats(raw.fileFormats),
     license,
     tags: [...new Set(splitListKeepDot(raw.tags))],
+    coverImage: normalizeCover(raw.coverImage, `${rowRef} (${id})`),
     linkCheckedAt: normalizeDate(raw.linkCheckedAt),
   };
 }

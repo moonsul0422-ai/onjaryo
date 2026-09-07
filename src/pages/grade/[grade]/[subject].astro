@@ -2,7 +2,7 @@
 import Base from '../../../layouts/Base.astro';
 import ResourceCard from '../../../components/ResourceCard.astro';
 import {
-  byGradeSubject, gradeSubjectKey, gradesOfSubject, orgByCode,
+  byGrade, byGradeSubject, gradeSubjectKey, gradesOfSubject, orgByCode,
   subjectsOfGrade, usedGradeSubjects,
 } from '../../../lib/data.js';
 import { GRADE_LABELS } from '../../../lib/taxonomy.js';
@@ -21,7 +21,9 @@ const label = GRADE_LABELS[grade] ?? grade;
 const title = `${label} ${subject}`;
 
 // 옆으로 옮겨 갈 곳: 같은 학년의 다른 과목, 같은 과목의 다른 학년.
-const siblingSubjects = subjectsOfGrade(grade).filter((s: string) => s !== subject);
+const allSubjects = subjectsOfGrade(grade);
+const siblingSubjects = allSubjects.filter((s: string) => s !== subject);
+const gradeTotal = (byGrade.get(grade) ?? []).length;
 const siblingGrades = gradesOfSubject(subject).filter((g: string) => g !== grade);
 
 const orgs = [...new Set(items.map((r: any) => r.orgCode))];
@@ -46,6 +48,23 @@ const metaDescription = `${title} 교육자료 ${items.length}건. 전국 교육
     <p class="lede">{description}</p>
     <p class="count">자료 {items.length}건</p>
   </header>
+
+  <nav class="picknext" aria-label="과목 고르기">
+    <ul class="subjtabs">
+      <li><a class="subjtab" href={gradeUrl(grade)}>전체<span class="n">{gradeTotal}</span></a></li>
+      {allSubjects.map((s: string) => (
+        <li>
+          <a
+            class="subjtab"
+            href={gradeSubjectUrl(grade, s)}
+            aria-current={s === subject ? 'page' : undefined}
+          >
+            {s}<span class="n">{byGradeSubject.get(gradeSubjectKey(grade, s)).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
 
   <h2 class="visually-hidden">{title} 자료 목록</h2>
   <ul class="rlist">
@@ -105,4 +124,10 @@ const metaDescription = `${title} 교육자료 ${items.length}건. 전국 교육
     margin: 0 0 0.6rem;
   }
   .widerlink { font-size: 0.9rem; }
+
+  .picknext {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
 </style>

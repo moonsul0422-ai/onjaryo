@@ -44,10 +44,11 @@ const metaDescription = `${label} 교육자료 ${items.length}건. ${description
   {subjects.length > 0 && (
     <nav class="picknext" aria-labelledby="pick-subject">
       <h2 id="pick-subject" class="picknext-h">과목을 고르면 더 좁혀집니다</h2>
-      <ul class="chips">
+      <ul class="subjtabs">
+        <li><a class="subjtab" href={gradeUrl(grade)} aria-current="page">전체<span class="n">{items.length}</span></a></li>
         {subjects.map((s: string) => (
           <li>
-            <a class="chip chip-go" href={gradeSubjectUrl(grade, s)}>
+            <a class="subjtab" href={gradeSubjectUrl(grade, s)}>
               {s}
               <span class="n">{byGradeSubject.get(gradeSubjectKey(grade, s)).length}</span>
             </a>
@@ -87,11 +88,17 @@ const metaDescription = `${label} 교육자료 ${items.length}건. ${description
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .picknext { margin-bottom: 1.3rem; }
+  /* 과목 탭은 학년 페이지에서 가장 중요한 다음 클릭지다.
+     목록보다 먼저 눈에 들어오도록 아래에 선을 그어 구역을 나눈다. */
+  .picknext {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
   .picknext-h {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--muted);
     font-weight: 600;
-    margin: 0 0 0.6rem;
+    margin: 0 0 0.7rem;
   }
 </style>

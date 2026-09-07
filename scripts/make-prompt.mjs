@@ -22,7 +22,7 @@ const OUT = resolve(ROOT, 'docs/curation-prompt.md');
 const COLUMNS = [
   'id', 'title', 'summary', 'tip', 'sourceUrl', 'orgCode', 'publishedAt',
   'audiences', 'schoolLevels', 'grades', 'subjects', 'topics',
-  'resourceType', 'fileFormats', 'license', 'tags', 'status',
+  'resourceType', 'fileFormats', 'license', 'tags', 'status', 'coverImage',
 ];
 
 function orgTable() {
@@ -93,6 +93,7 @@ ${COLUMNS.join('\t')}
 - **license** — ${LICENSES.join(', ')} 중에서. 공공누리 표시가 없으면 \`미표기\`.
 - **tags** — 3~5개. 주제보다 좁은 낱말. 사람들이 검색창에 칠 법한 말로.
 - **status** — 비워 두세요.
+- **coverImage** — 비워 두세요. 표지 이미지는 사람이 직접 넣습니다.
 
 ### 분류값 (여기 없는 값은 쓰지 마세요)
 

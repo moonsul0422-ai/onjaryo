@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import ResourceCard from '../../components/ResourceCard.astro';
+import Cover from '../../components/Cover.astro';
 import { resources, orgByCode, orgLineage, related } from '../../lib/data.js';
 import {
   SITE_NAME, absolute, formatDate, gradeSubjectUrl, gradeUrl, levelUrl, orgUrl, resourceUrl,
@@ -21,15 +22,14 @@ const lineage = org ? orgLineage(org) : [];
 const canonical = resourceUrl(resource.id);
 const relatedItems = related(resource, 6);
 
-// 목록에 노출할 속성. 값이 없는 줄은 아예 만들지 않는다.
+// 정보 칸. 값이 없는 칸은 아예 만들지 않는다.
+// 기관과 발행일은 맨 위 밴드에 이미 있으므로 여기서 되풀이하지 않는다.
 const facts = [
-  { label: '발행 기관', html: 'org' },
-  { label: '발행일', value: formatDate(resource.publishedAt) },
-  { label: '자료 유형', value: resource.resourceType },
-  { label: '파일 형식', value: resource.fileFormats.join(', ') || null },
   { label: '학년', html: 'grades' },
   { label: '교과', html: 'subjects' },
   { label: '학교급', html: 'levels' },
+  { label: '자료 유형', value: resource.resourceType },
+  { label: '파일 형식', value: resource.fileFormats.join(', ') || null },
   { label: '대상', value: resource.audiences.join(', ') || null },
   { label: '이용 조건', value: resource.license },
 ].filter((f) => {
@@ -111,41 +111,64 @@ const jsonLd = {
   </nav>
 
   <article class="detail">
-    <header class="detail-head">
-      <h1>{resource.title}</h1>
-      <p class="detail-sum">{resource.summary}</p>
-    </header>
+    <div class="band">
+      <div class="band-cover">
+        <Cover resource={resource} org={org} size="lg" />
+      </div>
 
-    {resource.tip && (
-      <aside class="tip note" aria-labelledby="tip-h">
-        <h2 id="tip-h" class="tip-h">언제 쓰나</h2>
-        <p>{resource.tip}</p>
-      </aside>
-    )}
+      <div class="band-main">
+        <p class="band-meta">
+          {org ? <a href={orgUrl(org.code)}>{org.name}</a> : <span>{resource.orgCode}</span>}
+          {lineage.length > 1 && (
+            <span class="muted"> · {lineage.slice(0, -1).map((o: any) => o.shortName).join(' › ')} 소속</span>
+          )}
+          {resource.publishedAt && (
+            <>
+              <span aria-hidden="true"> · </span>
+              <time datetime={resource.publishedAt}>{formatDate(resource.publishedAt)}</time>
+            </>
+          )}
+        </p>
 
-    <p class="detail-cta">
-      <a
-        class="btn"
-        href={resource.sourceUrl}
-        rel="noopener nofollow"
-        target="_blank"
-        data-source-link
-        data-resource-id={resource.id}
-      >
-        원문 보러 가기
-        <span class="visually-hidden">(새 창)</span>
-      </a>
-      <span class="detail-cta-note">
-        {org ? `${org.name} 사이트로 이동합니다. ` : '발행 기관 사이트로 이동합니다. '}
-        파일은 이곳에 보관하지 않습니다.
-      </span>
-    </p>
+        <h1>{resource.title}</h1>
 
-    {resource.clicks > 0 && (
-      <p class="detail-clicks">
-        이 자료의 원문으로 <b>{resource.clicks.toLocaleString('ko-KR')}번</b> 이동했습니다.
-      </p>
-    )}
+        <p class="band-cta">
+          <a
+            class="btn"
+            href={resource.sourceUrl}
+            rel="noopener nofollow"
+            target="_blank"
+            data-source-link
+            data-resource-id={resource.id}
+          >
+            {org ? `${org.shortName}에서 받기` : '원문 보러 가기'}
+            <span aria-hidden="true"> ↗</span>
+            <span class="visually-hidden">(새 창)</span>
+          </a>
+        </p>
+        <p class="band-note">
+          {resource.fileFormats.length > 0 && <>{resource.fileFormats.join(', ')} · </>}
+          온자료는 파일을 보관하지 않습니다
+          {resource.clicks > 0 && (
+            <> · 원문으로 <b>{resource.clicks.toLocaleString('ko-KR')}번</b> 이동했습니다</>
+          )}
+        </p>
+      </div>
+    </div>
+
+    <div class="cols">
+      <section class="col-sum" aria-labelledby="sum-h">
+        <h2 id="sum-h" class="col-h">무엇이 들어 있나요</h2>
+        <p class="detail-sum">{resource.summary}</p>
+      </section>
+
+      {resource.tip && (
+        <aside class="col-tip" aria-labelledby="tip-h">
+          <h2 id="tip-h" class="col-h col-h-go">언제 쓰나요</h2>
+          <p>{resource.tip}</p>
+        </aside>
+      )}
+    </div>
 
     <h2 class="visually-hidden">자료 정보</h2>
     <dl class="facts">
@@ -153,15 +176,6 @@ const jsonLd = {
         <div class="fact">
           <dt>{f.label}</dt>
           <dd>
-            {f.html === 'org' && org && (
-              <>
-                <a href={orgUrl(org.code)}>{org.name}</a>
-                {lineage.length > 1 && (
-                  <span class="muted"> · {lineage.slice(0, -1).map((o: any) => o.shortName).join(' › ')} 소속</span>
-                )}
-              </>
-            )}
-            {f.html === 'org' && !org && <span>{resource.orgCode}</span>}
             {f.html === 'grades' && (
               <ul class="inline-links">
                 {resource.grades.map((g: string) => (
@@ -244,55 +258,88 @@ const jsonLd = {
     padding: 1.4rem 1.25rem 1.5rem;
   }
 
-  .detail-head h1 {
-    font-family: var(--serif);
-    font-weight: 700;
-  }
-
-  .detail-sum {
-    font-size: 1.02rem;
-    margin-bottom: 1.1rem;
-  }
-
-  .tip { margin: 0 0 1.2rem; background: var(--tint); }
-  .tip-h {
-    font-size: 0.8rem;
-    letter-spacing: 0.06em;
-    color: var(--go-dark);
-    margin: 0 0 0.25rem;
-  }
-  .tip p { margin: 0; }
-
-  .detail-cta {
+  /* --------------------------------------------------------- 상단 밴드 */
+  /* 표지·제목·받기 버튼을 한 덩어리로 묶는다. 페이지를 열자마자 "이게 무슨
+     자료이고 어디서 받는지"가 한 화면에 들어와야 한다. */
+  .band {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.8rem;
+    gap: 1.4rem;
+    align-items: flex-start;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
     margin-bottom: 1.4rem;
   }
-  .detail-cta-note { font-size: 0.82rem; color: var(--muted); }
+  .band-cover { flex: none; line-height: 0; }
+  .band-main { min-width: 0; flex: 1; }
 
-  .detail-clicks {
-    margin: -0.9rem 0 1.3rem;
-    font-size: 0.84rem;
+  .band-meta {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .band-main h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    margin: 0 0 0.9rem;
+  }
+  .band-cta { margin: 0 0 0.45rem; }
+  .band-note {
+    margin: 0;
+    font-size: 0.82rem;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .detail-clicks b { color: var(--go-dark); font-weight: 600; }
+  .band-note b { color: var(--go-dark); font-weight: 600; }
 
+  /* ------------------------------------------------- 요약 · 활용법 두 칸 */
+  .cols {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .col-h {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0 0 0.4rem;
+  }
+  .col-h-go { color: var(--go-dark); }
+  .detail-sum { margin: 0; font-size: 1.02rem; }
+
+  .col-tip {
+    background: var(--tint);
+    border-radius: var(--radius);
+    padding: 0.9rem 1.05rem;
+    align-self: start;
+  }
+  .col-tip p { margin: 0; }
+
+  /* --------------------------------------------------------- 정보 칸 */
+  /* grid 로 두면 마지막 줄에 빈 칸이 남아 회색 덩어리가 생긴다.
+     flex 는 남는 폭을 마지막 줄 칸들이 나눠 가지므로 그런 구멍이 없다. */
   .facts {
+    display: flex;
+    flex-wrap: wrap;
     margin: 0 0 1.2rem;
-    border-top: 1px solid var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
   }
   .fact {
-    display: grid;
-    grid-template-columns: 7.5rem 1fr;
-    gap: 0.2rem 0.8rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--line);
+    flex: 1 1 9rem;
+    background: var(--card);
+    padding: 0.7rem 0.85rem;
+    box-shadow: inset -1px -1px 0 0 var(--line);
   }
-  .fact dt { color: var(--muted); font-size: 0.86rem; }
-  .fact dd { margin: 0; font-size: 0.92rem; }
+  .fact dt {
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+  }
+  .fact dd { margin: 0; font-size: 0.92rem; font-weight: 500; }
 
   .inline-links {
     list-style: none;
@@ -324,9 +371,13 @@ const jsonLd = {
   }
   .src-url { word-break: break-all; }
 
+  @media (max-width: 40rem) {
+    .cols { grid-template-columns: 1fr; gap: 1.1rem; }
+  }
+
   @media (max-width: 30rem) {
-    .fact { grid-template-columns: 1fr; }
-    .fact dt { font-size: 0.8rem; }
+    .band { gap: 1rem; }
+    .band-cover :global(.cover-lg) { width: 6.5rem; }
   }
 </style>
 

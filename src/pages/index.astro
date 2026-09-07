@@ -1,17 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
 import SearchBox from '../components/SearchBox.astro';
-import ResourceCard from '../components/ResourceCard.astro';
 import GradeNav from '../components/GradeNav.astro';
-import TopicNav from '../components/TopicNav.astro';
-import {
-  byOrg, bySubject, meta, orgByCode, popular, recent, usedOrgCodes, usedSubjects,
-} from '../lib/data.js';
-import { SITE_DESCRIPTION, SITE_NAME, formatDate, orgUrl, subjectUrl } from '../lib/site.js';
+import { meta } from '../lib/data.js';
+import { SITE_DESCRIPTION, SITE_NAME, formatDate } from '../lib/site.js';
 
-const latest = recent(10);
-const mostUsed = popular(5);
-const topOrgs = usedOrgCodes.slice(0, 8);
+// 첫 화면에는 학년만 둔다.
+// 과목·주제·기관은 학년을 고른 다음 화면에서 만난다. 처음부터 셋을 다 펼치면
+// 고를 것이 너무 많아져서, 정작 첫 클릭이 늦어진다.
 ---
 
 <Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
@@ -24,80 +20,16 @@ const topOrgs = usedOrgCodes.slice(0, 8);
     <SearchBox id="q-home" size="lg" label="자료 검색" placeholder="예: 초3 분수, 안전교육 활동지" />
   </section>
 
-  <section class="section pick" aria-labelledby="grade-h">
-    <div class="section-head">
-      <h2 id="grade-h">학년으로 찾기</h2>
-    </div>
+  <section class="pick" aria-labelledby="grade-h">
+    <h2 id="grade-h" class="pick-h">학년으로 찾기</h2>
     <GradeNav big />
   </section>
 
-  <section class="section pick" aria-labelledby="subject-h">
-    <div class="section-head">
-      <h2 id="subject-h">과목으로 찾기</h2>
-    </div>
-    <ul class="chips">
-      {usedSubjects.map((s: string) => (
-        <li>
-          <a class="chip chip-big" href={subjectUrl(s)}>
-            {s}<span class="n">{bySubject.get(s).length}</span>
-          </a>
-        </li>
-      ))}
-    </ul>
-  </section>
+  <p class="more">
+    학년이 정해지지 않았다면 <a href="/search">전체 검색</a>에서 과목·주제·기관으로 좁혀 볼 수 있습니다.
+  </p>
 
-  {mostUsed.length > 0 && (
-    <section class="section" aria-labelledby="popular-h">
-      <div class="section-head">
-        <h2 id="popular-h">많이 찾는 자료</h2>
-      </div>
-      <p class="section-note">원문으로 가장 많이 이동한 자료입니다.</p>
-      <ul class="rlist">
-        {mostUsed.map((r: any) => (
-          <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} compact headingLevel={3} /></li>
-        ))}
-      </ul>
-    </section>
-  )}
-
-  <section class="section" aria-labelledby="recent-h">
-    <div class="section-head">
-      <h2 id="recent-h">최근 등록</h2>
-      <a href="/search">전체 검색</a>
-    </div>
-    <ul class="rlist">
-      {latest.map((r: any) => (
-        <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
-      ))}
-    </ul>
-  </section>
-
-  <section class="section" aria-labelledby="topics-h">
-    <div class="section-head">
-      <h2 id="topics-h">주제로 찾기</h2>
-    </div>
-    <p class="section-note">
-      교과로 묶이지 않는 자료 — 안전교육, 학급운영, 학부모 안내 같은 것들은 여기 모입니다.
-    </p>
-    <TopicNav />
-  </section>
-
-  <section class="section" aria-labelledby="orgs-h">
-    <div class="section-head">
-      <h2 id="orgs-h">기관으로 찾기</h2>
-    </div>
-    <ul class="chips">
-      {topOrgs.map((code: string) => (
-        <li>
-          <a class="chip" href={orgUrl(code)}>
-            {orgByCode.get(code).shortName}<span class="n">{byOrg.get(code).length}</span>
-          </a>
-        </li>
-      ))}
-    </ul>
-  </section>
-
-  <section class="section stats" aria-labelledby="stats-h">
+  <section class="stats" aria-labelledby="stats-h">
     <h2 id="stats-h" class="visually-hidden">등록 현황</h2>
     <dl class="statlist">
       <div>
@@ -121,7 +53,7 @@ const topOrgs = usedOrgCodes.slice(0, 8);
 
 <style>
   .hero {
-    padding: 1.5rem 0 0.5rem;
+    padding: 2rem 0 0.5rem;
     max-width: 42rem;
   }
   .hero h1 {
@@ -138,18 +70,26 @@ const topOrgs = usedOrgCodes.slice(0, 8);
   .hero-lede b { color: var(--ink); font-weight: 600; }
 
   .pick {
+    margin-top: 2.5rem;
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 1rem 1.1rem 1.1rem;
+    padding: 1.15rem 1.2rem 1.25rem;
   }
-  .pick .section-head { margin-bottom: 0.8rem; }
-  .section-note {
-    font-size: 0.86rem;
+  .pick-h {
+    font-size: 0.9rem;
     color: var(--muted);
-    margin: -0.3rem 0 0.7rem;
+    font-weight: 600;
+    margin: 0 0 0.85rem;
   }
 
+  .more {
+    margin: 1.1rem 0 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .stats { margin-top: 2.5rem; }
   .statlist {
     display: flex;
     flex-wrap: wrap;
