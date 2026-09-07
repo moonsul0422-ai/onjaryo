@@ -2,11 +2,25 @@
 // 검색 결과 화면에서만 쓴다. 홈에는 필터를 두지 않는다.
 // 서버에서 전체 선택지를 그려 두고, 스크립트가 현재 결과에 맞춰
 // 건수를 붙이고 0건인 선택지를 비활성화한다.
-import { byLevel, byTopic, byType, usedLevels, usedTopics, usedTypes } from '../lib/data.js';
+import {
+  byGrade, bySubject, byTopic, byType,
+  usedGrades, usedSubjects, usedTopics, usedTypes,
+} from '../lib/data.js';
+import { GRADE_LABELS } from '../lib/taxonomy.js';
 
+// 학교급(level)은 바에 두지 않는다. 학년이 있으면 거의 겹치고,
+// 좁은 화면에서 선택지가 다섯 개면 필터가 결과보다 커진다.
+// (URL 에 level= 이 실려 오면 매칭 쪽에서는 그대로 적용된다.)
 const groups = [
-  { key: 'level', label: '학교급', values: usedLevels, counts: byLevel },
-  { key: 'topic', label: '영역', values: usedTopics, counts: byTopic },
+  {
+    key: 'grade',
+    label: '학년',
+    values: usedGrades,
+    counts: byGrade,
+    labelOf: (v: string) => GRADE_LABELS[v] ?? v,
+  },
+  { key: 'subject', label: '과목', values: usedSubjects, counts: bySubject },
+  { key: 'topic', label: '주제', values: usedTopics, counts: byTopic },
   { key: 'type', label: '자료 유형', values: usedTypes, counts: byType },
 ];
 ---
@@ -19,7 +33,9 @@ const groups = [
       <select class="filter-select" id={`filter-${g.key}`} name={g.key} data-filter={g.key}>
         <option value="">전체</option>
         {g.values.map((v: string) => (
-          <option value={v} data-total={g.counts.get(v).length}>{v}</option>
+          <option value={v} data-label={g.labelOf ? g.labelOf(v) : v}>
+            {g.labelOf ? g.labelOf(v) : v}
+          </option>
         ))}
       </select>
     </p>
@@ -44,7 +60,7 @@ const groups = [
     flex-direction: column;
     gap: 0.2rem;
     margin: 0;
-    flex: 1 1 9rem;
+    flex: 1 1 8rem;
     min-width: 0;
   }
   .filter-label { font-size: 0.78rem; color: var(--muted); }
@@ -60,4 +76,8 @@ const groups = [
   }
   .filter-select option:disabled { color: #b4bac4; }
   .filter-reset { flex: none; padding: 0.42rem 0.8rem; font-size: 0.85rem; }
+
+  @media (max-width: 34rem) {
+    .filter { flex: 1 1 45%; }
+  }
 </style>

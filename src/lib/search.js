@@ -24,6 +24,8 @@ export function buildSearchKey(resource, org) {
       resource.tip || '',
       ...(resource.tags || []),
       ...(resource.topics || []),
+      ...(resource.grades || []),
+      ...(resource.subjects || []),
       org?.name || '',
       org?.shortName || '',
     ].join(' ')
@@ -33,9 +35,9 @@ export function buildSearchKey(resource, org) {
 /**
  * 색인 항목.
  *   i 아이디 · t 제목 · o 기관 약칭 · d 발행일 · k 검색키
- * 뒤의 셋은 검색 결과 화면의 필터 바(학교급 / 영역 / 자료유형) 전용이다.
+ * 뒤의 것들은 검색 결과 화면의 필터 바 전용이다.
  * 필터를 클라이언트에서 거는 이상 이 값들이 없으면 필터를 만들 수 없다.
- *   l 학교급 · p 영역 · y 자료유형
+ *   g 학년 · s 과목 · l 학교급 · p 주제 · y 자료유형
  */
 export function buildIndex(resources, organizations) {
   const orgByCode = new Map((organizations || []).map((o) => [o.code, o]));
@@ -48,6 +50,8 @@ export function buildIndex(resources, organizations) {
       d: r.publishedAt || '',
       k: buildSearchKey(r, org),
     };
+    if (r.grades?.length) entry.g = r.grades;
+    if (r.subjects?.length) entry.s = r.subjects;
     if (r.schoolLevels?.length) entry.l = r.schoolLevels;
     if (r.topics?.length) entry.p = r.topics;
     if (r.resourceType) entry.y = r.resourceType;
@@ -103,28 +107,44 @@ export function search(entries, query, options = {}) {
   return hits.slice(0, limit);
 }
 
+/**
+ * 필터 키 → 색인 필드. 배열 필드는 포함 여부로, 홑값 필드는 같은지로 본다.
+ * 필터를 늘릴 때 여기만 고치면 applyFilters 와 facetCounts 가 함께 따라온다.
+ */
+export const FILTERS = [
+  { key: 'grade', field: 'g', multi: true },
+  { key: 'subject', field: 's', multi: true },
+  { key: 'level', field: 'l', multi: true },
+  { key: 'topic', field: 'p', multi: true },
+  { key: 'type', field: 'y', multi: false },
+];
+
+export const FILTER_KEYS = FILTERS.map((f) => f.key);
+
 /** 필터 바에서 고른 값으로 결과를 좁힌다. 빈 값은 조건 없음. */
 export function applyFilters(hits, filters = {}) {
-  const { level, topic, type } = filters;
-  if (!level && !topic && !type) return hits;
-  return hits.filter(({ entry }) => {
-    if (level && !(entry.l || []).includes(level)) return false;
-    if (topic && !(entry.p || []).includes(topic)) return false;
-    if (type && entry.y !== type) return false;
-    return true;
-  });
+  const active = FILTERS.filter((f) => filters[f.key]);
+  if (active.length === 0) return hits;
+  return hits.filter(({ entry }) =>
+    active.every((f) =>
+      f.multi ? (entry[f.field] || []).includes(filters[f.key]) : entry[f.field] === filters[f.key]
+    )
+  );
 }
 
 /** 현재 결과에서 실제로 고를 수 있는 값과 건수. 0건인 선택지는 만들지 않는다. */
 export function facetCounts(hits) {
-  const bump = (map, key) => { if (key) map.set(key, (map.get(key) || 0) + 1); };
-  const level = new Map();
-  const topic = new Map();
-  const type = new Map();
+  const counts = Object.fromEntries(FILTERS.map((f) => [f.key, new Map()]));
   for (const { entry } of hits) {
-    for (const l of entry.l || []) bump(level, l);
-    for (const p of entry.p || []) bump(topic, p);
-    bump(type, entry.y);
+    for (const f of FILTERS) {
+      const map = counts[f.key];
+      const value = entry[f.field];
+      if (f.multi) {
+        for (const v of value || []) map.set(v, (map.get(v) || 0) + 1);
+      } else if (value) {
+        map.set(value, (map.get(value) || 0) + 1);
+      }
+    }
   }
-  return { level, topic, type };
+  return counts;
 }

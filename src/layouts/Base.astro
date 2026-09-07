@@ -112,8 +112,33 @@ const isSample = meta.source !== 'sheet';
           마지막 갱신 <time datetime={meta.syncedAt}>{meta.syncedAt.slice(0, 10)}</time>
           {isSample && <span class="sample-flag">예시 데이터</span>}
         </p>
+        <p class="foot-visits" id="foot-visits" hidden>
+          오늘 <b id="visits-today">–</b>명 · 누적 <b id="visits-total">–</b>명이 다녀갔습니다
+        </p>
       </div>
     </footer>
+
+    <script>
+      // 방문자 수. 서버가 세고 이 자리를 채운다.
+      // 카운터가 꺼져 있거나 요청이 실패하면 줄 자체를 띄우지 않는다.
+      // 숫자를 못 가져왔다고 "0명"을 보여 주면 거짓말이 된다.
+      (async () => {
+        const box = document.getElementById('foot-visits');
+        if (!box) return;
+        try {
+          const res = await fetch('/api/visit', { method: 'POST', cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data?.enabled) return;
+          const fmt = (n: number) => Number(n).toLocaleString('ko-KR');
+          document.getElementById('visits-today')!.textContent = fmt(data.today);
+          document.getElementById('visits-total')!.textContent = fmt(data.total);
+          box.hidden = false;
+        } catch {
+          /* 방문자 수는 있으면 좋은 것이지 없으면 안 되는 것이 아니다. */
+        }
+      })();
+    </script>
 
     <style is:global>
       :root {
@@ -269,6 +294,12 @@ const isSample = meta.source !== 'sheet';
         margin: 0 0 0.6rem;
       }
       .foot-meta { margin: 0; font-variant-numeric: tabular-nums; }
+      .foot-visits {
+        margin: 0.25rem 0 0;
+        font-variant-numeric: tabular-nums;
+        font-size: 0.85rem;
+      }
+      .foot-visits b { color: var(--ink); font-weight: 600; }
       .sample-flag {
         display: inline-block;
         margin-left: 0.4rem;

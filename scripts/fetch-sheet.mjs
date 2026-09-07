@@ -16,6 +16,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { isEnabled as kvEnabled, pipeline as kvPipeline, toInt } from '../api/_kv.js';
 import {
   isAudience, isGrade, isLevel, isLicense, isSubject, isTopic, isType,
   byGradeOrder, byLevelOrder, bySubjectOrder, byTopicOrder,
@@ -407,12 +408,33 @@ async function main() {
     if (!usedOrgs.has(o.code)) warn(`기관 (${o.code} ${o.shortName}): 연결된 자료가 없습니다`);
   }
 
+  // 원문 클릭 수를 붙인다. 자료가 얼마나 쓰이는지 보여 주는 유일한 숫자다.
+  // KV 가 설정돼 있지 않으면 조용히 건너뛴다 — 카운터 없이도 사이트는 돌아간다.
+  let clicksAttached = 0;
+  if (kvEnabled() && resources.length > 0) {
+    try {
+      const counts = await kvPipeline(resources.map((r) => ['GET', `click:${r.id}`]));
+      resources.forEach((r, i) => {
+        r.clicks = toInt(counts[i]);
+        if (r.clicks > 0) clicksAttached += 1;
+      });
+      console.log(`  클릭 수를 ${clicksAttached}건에 붙였습니다.`);
+    } catch (err) {
+      warn(`클릭 수를 가져오지 못했습니다 (${err.message}). 0으로 둡니다.`);
+      for (const r of resources) r.clicks = 0;
+    }
+  } else {
+    for (const r of resources) r.clicks = 0;
+  }
+
   const meta = {
     source,
     syncedAt: new Date().toISOString(),
     total: resources.length,
     orgCount: orgs.filter((o) => usedOrgs.has(o.code)).length,
     latestPublishedAt: resources.find((r) => r.publishedAt)?.publishedAt || null,
+    countersEnabled: kvEnabled(),
+    totalClicks: resources.reduce((sum, r) => sum + (r.clicks || 0), 0),
     warnings: warnings.length,
   };
 

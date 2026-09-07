@@ -5,11 +5,12 @@ import ResourceCard from '../components/ResourceCard.astro';
 import GradeNav from '../components/GradeNav.astro';
 import TopicNav from '../components/TopicNav.astro';
 import {
-  byOrg, bySubject, meta, orgByCode, recent, usedOrgCodes, usedSubjects,
+  byOrg, bySubject, meta, orgByCode, popular, recent, usedOrgCodes, usedSubjects,
 } from '../lib/data.js';
 import { SITE_DESCRIPTION, SITE_NAME, formatDate, orgUrl, subjectUrl } from '../lib/site.js';
 
 const latest = recent(10);
+const mostUsed = popular(5);
 const topOrgs = usedOrgCodes.slice(0, 8);
 ---
 
@@ -44,6 +45,20 @@ const topOrgs = usedOrgCodes.slice(0, 8);
       ))}
     </ul>
   </section>
+
+  {mostUsed.length > 0 && (
+    <section class="section" aria-labelledby="popular-h">
+      <div class="section-head">
+        <h2 id="popular-h">많이 찾는 자료</h2>
+      </div>
+      <p class="section-note">원문으로 가장 많이 이동한 자료입니다.</p>
+      <ul class="rlist">
+        {mostUsed.map((r: any) => (
+          <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} compact headingLevel={3} /></li>
+        ))}
+      </ul>
+    </section>
+  )}
 
   <section class="section" aria-labelledby="recent-h">
     <div class="section-head">

@@ -1,26 +1,8 @@
-// 브라우저 테스트.  playwright-core 와 크로미움이 필요하다.
-//
-//   npm run build && npx astro preview --port 4321 &
-//   npm i --no-save playwright-core
-//   npm run test:browser
-//
-// BASE_URL, CHROME_PATH 로 대상과 실행 파일을 바꿀 수 있다.
 import { chromium } from 'playwright-core';
 import assert from 'node:assert/strict';
 
-const BASE = process.env.BASE_URL || 'http://localhost:4321';
-const EXE = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const browser = await chromium.launch({ executablePath: EXE });
-/** 외부 폰트 CDN 은 테스트에 필요 없다. 막아 두면 networkidle 이 빨리 끝나고
- *  결과가 네트워크 상태에 흔들리지 않는다. */
-async function blockExternal(ctx) {
-  await ctx.route('**/*', (route) => {
-    const url = route.request().url();
-    if (url.startsWith(BASE) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
-    return route.abort();
-  });
-}
-
+const BASE = 'http://localhost:4321';
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const errors = [];
 
 async function newPage(ctx) {
@@ -40,7 +22,6 @@ async function newPage(ctx) {
 }
 
 const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-await blockExternal(ctx);
 const page = await newPage(ctx);
 
 // --- 1. 검색창 입력 → 결과
@@ -70,32 +51,48 @@ const page3 = await newPage(ctx);
 await page3.goto(`${BASE}/search/?q=${encodeURIComponent('안전')}`, { waitUntil: 'networkidle' });
 await page3.waitForFunction(() => document.querySelectorAll('#result-list > li').length > 0, null, { timeout: 5000 });
 const before = await page3.locator('#result-list > li').count();
-await page3.selectOption('#filter-level', '초등');
+await page3.selectOption('#filter-grade', '초3');
 await page3.waitForFunction((b) => document.querySelectorAll('#result-list > li').length < b, before, { timeout: 5000 });
 const after = await page3.locator('#result-list > li').count();
-console.log(`필터 전 ${before}건 → 초등 ${after}건`);
+console.log(`필터 전 ${before}건 → 초3 ${after}건`);
 assert.ok(after > 0 && after < before);
-assert.ok(new URL(page3.url()).searchParams.get('level') === '초등', '필터가 URL 에 들어간다');
+assert.ok(new URL(page3.url()).searchParams.get('grade') === '초3', '필터가 URL 에 들어간다');
 assert.ok(await page3.locator('[data-filter-reset]').isVisible(), '필터 해제 버튼이 나타난다');
 // 옵션에 건수가 붙는가
-const optText = await page3.locator('#filter-level option[value="초등"]').textContent();
+const optText = await page3.locator('#filter-grade option[value="초3"]').textContent();
 console.log('옵션 라벨:', optText);
 assert.ok(/\(\d+\)/.test(optText), '옵션에 건수 표기');
 
 // 필터 URL 로 바로 진입해도 상태가 살아 있는가
 const page3b = await newPage(ctx);
-await page3b.goto(`${BASE}/search/?q=${encodeURIComponent('안전')}&level=${encodeURIComponent('초등')}`, { waitUntil: 'networkidle' });
+await page3b.goto(`${BASE}/search/?q=${encodeURIComponent('안전')}&grade=${encodeURIComponent('초3')}`, { waitUntil: 'networkidle' });
 await page3b.waitForFunction(() => document.querySelectorAll('#result-list > li').length > 0, null, { timeout: 5000 });
 assert.equal(await page3b.inputValue('#q'), '안전');
-assert.equal(await page3b.locator('#filter-level').inputValue(), '초등');
+assert.equal(await page3b.locator('#filter-grade').inputValue(), '초3');
 assert.equal(await page3b.locator('#result-list > li').count(), after, '공유 URL 이 같은 결과를 낸다');
 console.log('필터 포함 URL 재현 OK');
 
 // 해제
 await page3b.click('[data-filter-reset]');
 await page3b.waitForFunction((a) => document.querySelectorAll('#result-list > li').length > a, after, { timeout: 5000 });
-assert.equal(new URL(page3b.url()).searchParams.get('level'), null, '해제하면 URL 에서도 빠진다');
+assert.equal(new URL(page3b.url()).searchParams.get('grade'), null, '해제하면 URL 에서도 빠진다');
 console.log('필터 해제 OK');
+
+// 화면에 없는 필터(level)를 URL 에 실어도 조용히 걸리면 안 된다.
+// 보이지도 지워지지도 않는 조건이 되기 때문이다.
+const page3c = await newPage(ctx);
+await page3c.goto(`${BASE}/search/?q=${encodeURIComponent('안전')}&level=${encodeURIComponent('초등')}`, { waitUntil: 'networkidle' });
+await page3c.waitForFunction(() => document.querySelectorAll('#result-list > li').length > 0, null, { timeout: 5000 });
+const plain = await newPage(ctx);
+await plain.goto(`${BASE}/search/?q=${encodeURIComponent('안전')}`, { waitUntil: 'networkidle' });
+await plain.waitForFunction(() => document.querySelectorAll('#result-list > li').length > 0, null, { timeout: 5000 });
+assert.equal(
+  await page3c.locator('#result-list > li').count(),
+  await plain.locator('#result-list > li').count(),
+  '화면에 없는 필터는 URL 로도 걸리지 않는다'
+);
+assert.ok(!(await page3c.locator('[data-filter-reset]').isVisible()), '걸린 필터가 없으니 해제 버튼도 없다');
+console.log('화면 밖 필터 무시 OK');
 
 // --- 4. 빈 결과 안내
 const page4 = await newPage(ctx);
@@ -128,11 +125,25 @@ console.log(`"교육" 첫 페이지 ${first}건 ·`, await page6.locator('#resul
 assert.equal(first, 20, '한 번에 20건');
 assert.ok(await page6.locator('#more-btn').isVisible(), '남았으면 더보기가 보인다');
 console.log('더보기 라벨:', await page6.locator('#more-btn').textContent());
-await page6.click('#more-btn');
-const second = await page6.locator('#result-list > li').count();
-console.log('더보기 후', second, '건');
-assert.ok(second > first, '더보기로 늘어난다');
-assert.ok(!(await page6.locator('#more-btn').isVisible()), '다 보여 주면 더보기가 사라진다');
+
+// 결과 수는 시드에 따라 달라진다. 버튼이 사라질 때까지 눌러 본다.
+const statusText = await page6.locator('#result-status').textContent();
+const totalHits = Number(/결과 (\d+)건/.exec(statusText)?.[1]);
+assert.ok(totalHits > 20, `상태줄에서 총 건수를 읽는다 (${statusText})`);
+
+let shown = first;
+let clicks = 0;
+while (await page6.locator('#more-btn').isVisible()) {
+  await page6.click('#more-btn');
+  clicks += 1;
+  const now = await page6.locator('#result-list > li').count();
+  assert.ok(now > shown, '더보기로 늘어난다');
+  assert.ok(now - shown <= 20, '한 번에 20건까지만 늘어난다');
+  shown = now;
+  assert.ok(clicks < 20, '더보기가 끝나지 않는다');
+}
+console.log(`더보기 ${clicks}번 → ${shown}건`);
+assert.equal(shown, totalHits, '다 눌렀으면 전체 결과가 나온다');
 
 // 결과가 20건 이하이면 더보기가 처음부터 없다
 const page7 = await newPage(ctx);

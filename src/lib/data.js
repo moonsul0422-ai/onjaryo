@@ -93,6 +93,13 @@ export const byNewest = (list) =>
 
 export const recent = (n) => resources.slice(0, n);
 
+/** 원문으로 많이 넘어간 자료. 클릭이 0이면 목록 자체를 만들지 않는다. */
+export const popular = (n) =>
+  resources
+    .filter((r) => (r.clicks || 0) > 0)
+    .sort((a, b) => b.clicks - a.clicks || (b.publishedAt || '').localeCompare(a.publishedAt || ''))
+    .slice(0, n);
+
 export const orgOf = (resource) => orgByCode.get(resource.orgCode) ?? null;
 
 export const orgShortName = (resource) => orgOf(resource)?.shortName ?? resource.orgCode;

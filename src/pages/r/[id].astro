@@ -117,7 +117,14 @@ const jsonLd = {
     )}
 
     <p class="detail-cta">
-      <a class="btn" href={resource.sourceUrl} rel="noopener nofollow" target="_blank">
+      <a
+        class="btn"
+        href={resource.sourceUrl}
+        rel="noopener nofollow"
+        target="_blank"
+        data-source-link
+        data-resource-id={resource.id}
+      >
         원문 보러 가기
         <span class="visually-hidden">(새 창)</span>
       </a>
@@ -126,6 +133,12 @@ const jsonLd = {
         파일은 이곳에 보관하지 않습니다.
       </span>
     </p>
+
+    {resource.clicks > 0 && (
+      <p class="detail-clicks">
+        이 자료의 원문으로 <b>{resource.clicks.toLocaleString('ko-KR')}번</b> 이동했습니다.
+      </p>
+    )}
 
     <h2 class="visually-hidden">자료 정보</h2>
     <dl class="facts">
@@ -225,6 +238,14 @@ const jsonLd = {
   }
   .detail-cta-note { font-size: 0.82rem; color: var(--muted); }
 
+  .detail-clicks {
+    margin: -0.9rem 0 1.3rem;
+    font-size: 0.84rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .detail-clicks b { color: var(--go-dark); font-weight: 600; }
+
   .facts {
     margin: 0 0 1.2rem;
     border-top: 1px solid var(--line);
@@ -265,3 +286,21 @@ const jsonLd = {
     .fact dt { font-size: 0.8rem; }
   }
 </style>
+
+<script>
+  // 원문으로 넘어간 횟수를 남긴다.
+  // sendBeacon 은 페이지를 떠나도 요청이 살아남고, 이동을 늦추지 않는다.
+  // 실패하든 차단되든 링크 동작에는 아무 영향이 없어야 한다.
+  const link = document.querySelector<HTMLAnchorElement>('[data-source-link]');
+  const id = link?.dataset.resourceId;
+  if (link && id) {
+    link.addEventListener('click', () => {
+      try {
+        const body = new Blob([JSON.stringify({ id })], { type: 'application/json' });
+        navigator.sendBeacon?.('/api/click', body);
+      } catch {
+        /* 집계는 부가 기능이다. 사용자 흐름을 막지 않는다. */
+      }
+    });
+  }
+</script>

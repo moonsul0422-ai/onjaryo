@@ -59,13 +59,14 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
 
 <script>
   import {
-    applyFilters, facetCounts, prepareIndex, search, tokenize,
+    applyFilters, facetCounts, prepareIndex, search,
     MAX_RESULTS, PAGE_SIZE,
   } from '../lib/search.js';
+  import { formatGradeRange } from '../lib/site.js';
 
   type Entry = {
     i: string; t: string; o: string; d: string; k: string; nt?: string;
-    l?: string[]; p?: string[]; y?: string;
+    g?: string[]; s?: string[]; l?: string[]; p?: string[]; y?: string;
   };
   type Hit = { entry: Entry; score: number };
 
@@ -91,9 +92,14 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
   let hits: Hit[] = [];
   let shown = 0;
 
-  const FILTER_KEYS = ['level', 'topic', 'type'] as const;
-  type FilterKey = (typeof FILTER_KEYS)[number];
-  const filters: Record<FilterKey, string> = { level: '', topic: '', type: '' };
+  // 다룰 필터는 화면에 실제로 있는 select 로 정한다.
+  // search.js 는 그보다 많은 필터를 알고 있지만(예: 학교급), 화면에 없는 필터를
+  // URL 로 걸면 사용자에게는 보이지도 지워지지도 않는 조건이 된다.
+  type FilterKey = string;
+  const FILTER_KEYS: FilterKey[] = selects.map((el) => el.dataset.filter as FilterKey);
+  const filters: Record<FilterKey, string> = Object.fromEntries(
+    FILTER_KEYS.map((k) => [k, ''])
+  );
 
   /* ------------------------------------------------------------ 색인 로딩 */
 
@@ -119,6 +125,7 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
   /* -------------------------------------------------------------- 렌더링 */
 
   const topicHref = (t: string) => `/topic/${encodeURIComponent(t)}/`;
+  const subjectHref = (t: string) => `/subject/${encodeURIComponent(t)}/`;
   const shortDate = (d: string) => (d ? d.replace(/-/g, '.') : '');
 
   function renderCard(entry: Entry): HTMLLIElement {
@@ -148,6 +155,16 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
       time.textContent = shortDate(entry.d);
       metaP.append(dot, time);
     }
+    const gradeLabel = formatGradeRange(entry.g || []);
+    if (gradeLabel) {
+      const dot = document.createElement('span');
+      dot.setAttribute('aria-hidden', 'true');
+      dot.textContent = '·';
+      const g = document.createElement('span');
+      g.className = 'rcard-grade';
+      g.textContent = gradeLabel;
+      metaP.append(dot, g);
+    }
     if (entry.y) {
       const dot = document.createElement('span');
       dot.setAttribute('aria-hidden', 'true');
@@ -159,18 +176,20 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
 
     article.append(h3, metaP);
 
-    if (entry.p?.length) {
+    if (entry.s?.length || entry.p?.length) {
       const ul = document.createElement('ul');
       ul.className = 'rcard-topics';
-      for (const t of entry.p) {
+      const addChip = (text: string, href: string, extra?: string) => {
         const item = document.createElement('li');
         const chip = document.createElement('a');
-        chip.className = 'chip chip-sm';
-        chip.href = topicHref(t);
-        chip.textContent = t;
+        chip.className = extra ? `chip chip-sm ${extra}` : 'chip chip-sm';
+        chip.href = href;
+        chip.textContent = text;
         item.append(chip);
         ul.append(item);
-      }
+      };
+      for (const sub of entry.s || []) addChip(sub, subjectHref(sub), 'chip-subject');
+      for (const t of entry.p || []) addChip(t, topicHref(t));
       article.append(ul);
     }
 
@@ -193,8 +212,9 @@ const description = `${SITE_NAME}에 등록된 교육자료 ${meta.total}건을 
       const map = counts[key] as Map<string, number>;
       for (const option of Array.from(select.options)) {
         if (!option.value) continue;
+        const label = option.dataset.label || option.value;
         const n = map.get(option.value) ?? 0;
-        option.textContent = n > 0 ? `${option.value} (${n})` : option.value;
+        option.textContent = n > 0 ? `${label} (${n})` : label;
         // 지금 고른 값은 0건이 되어도 끄지 않는다. 스스로 해제할 수 없게 되기 때문이다.
         option.disabled = n === 0 && option.value !== filters[key];
       }
