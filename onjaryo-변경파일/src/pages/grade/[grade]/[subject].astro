@@ -1,0 +1,133 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ResourceCard from '../../../components/ResourceCard.astro';
+import {
+  byGrade, byGradeSubject, gradeSubjectKey, gradesOfSubject, orgByCode,
+  subjectsOfGrade, usedGradeSubjects,
+} from '../../../lib/data.js';
+import { GRADE_LABELS } from '../../../lib/taxonomy.js';
+import { gradeSubjectUrl, gradeUrl, subjectUrl } from '../../../lib/site.js';
+
+export function getStaticPaths() {
+  // 자료가 있는 조합만. 학년 × 과목을 전부 만들면 빈 페이지가 쏟아진다.
+  return usedGradeSubjects.map(({ grade, subject, items }) => ({
+    params: { grade, subject },
+    props: { grade, subject, items },
+  }));
+}
+
+const { grade, subject, items } = Astro.props;
+const label = GRADE_LABELS[grade] ?? grade;
+const title = `${label} ${subject}`;
+
+// 옆으로 옮겨 갈 곳: 같은 학년의 다른 과목, 같은 과목의 다른 학년.
+const allSubjects = subjectsOfGrade(grade);
+const siblingSubjects = allSubjects.filter((s: string) => s !== subject);
+const gradeTotal = (byGrade.get(grade) ?? []).length;
+const siblingGrades = gradesOfSubject(subject).filter((g: string) => g !== grade);
+
+const orgs = [...new Set(items.map((r: any) => r.orgCode))];
+const description =
+  `${title} 수업에 쓸 수 있는 교육자료 ${items.length}건을 모았습니다. ` +
+  `${orgs.length}개 기관이 공개한 자료이며, 원문은 모두 발행 기관 사이트에 있습니다. ` +
+  `자료를 누르면 요약과 활용팁을 먼저 확인한 뒤 원문으로 갈 수 있습니다.`;
+const metaDescription = `${title} 교육자료 ${items.length}건. 전국 교육청이 공개한 ${subject} 수업자료를 ${label} 기준으로 모았습니다.`.slice(0, 155);
+---
+
+<Base title={`${title} 교육자료`} description={metaDescription} canonical={gradeSubjectUrl(grade, subject)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      <li><a href={gradeUrl(grade)}>{label}</a></li>
+      <li aria-current="page">{subject}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{title}</h1>
+    <p class="lede">{description}</p>
+    <p class="count">자료 {items.length}건</p>
+  </header>
+
+  <nav class="picknext" aria-label="과목 고르기">
+    <ul class="subjtabs">
+      <li><a class="subjtab" href={gradeUrl(grade)}>전체<span class="n">{gradeTotal}</span></a></li>
+      {allSubjects.map((s: string) => (
+        <li>
+          <a
+            class="subjtab"
+            href={gradeSubjectUrl(grade, s)}
+            aria-current={s === subject ? 'page' : undefined}
+          >
+            {s}<span class="n">{byGradeSubject.get(gradeSubjectKey(grade, s)).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+
+  <h2 class="visually-hidden">{title} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  {siblingSubjects.length > 0 && (
+    <nav class="section" aria-label="같은 학년의 다른 과목">
+      <h2 class="picknext-h">{label}의 다른 과목</h2>
+      <ul class="chips">
+        {siblingSubjects.map((s: string) => (
+          <li>
+            <a class="chip" href={gradeSubjectUrl(grade, s)}>
+              {s}<span class="n">{byGradeSubject.get(gradeSubjectKey(grade, s)).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  {siblingGrades.length > 0 && (
+    <nav class="section" aria-label="같은 과목의 다른 학년">
+      <h2 class="picknext-h">다른 학년의 {subject}</h2>
+      <ul class="chips">
+        {siblingGrades.map((g: string) => (
+          <li>
+            <a class="chip" href={gradeSubjectUrl(g, subject)}>
+              {GRADE_LABELS[g] ?? g}
+              <span class="n">{byGradeSubject.get(gradeSubjectKey(g, subject)).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <p class="section widerlink">
+    <a href={subjectUrl(subject)}>{subject} 자료 전체 보기</a> ·
+    <a href={gradeUrl(grade)}>{label} 자료 전체 보기</a>
+  </p>
+</Base>
+
+<style>
+  .count {
+    margin: 0.6rem 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .picknext-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.6rem;
+  }
+  .widerlink { font-size: 0.9rem; }
+
+  .picknext {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+</style>

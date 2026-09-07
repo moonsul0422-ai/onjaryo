@@ -1,0 +1,400 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import Cover from '../../components/Cover.astro';
+import { resources, orgByCode, orgLineage, related } from '../../lib/data.js';
+import {
+  SITE_NAME, absolute, formatDate, gradeSubjectUrl, gradeUrl, levelUrl, orgUrl, resourceUrl,
+  subjectUrl, tagUrl, topicUrl,
+} from '../../lib/site.js';
+import { GRADE_LABELS } from '../../lib/taxonomy.js';
+
+export function getStaticPaths() {
+  return resources.map((resource) => ({
+    params: { id: resource.id },
+    props: { resource },
+  }));
+}
+
+const { resource } = Astro.props;
+const org = orgByCode.get(resource.orgCode) ?? null;
+const lineage = org ? orgLineage(org) : [];
+const canonical = resourceUrl(resource.id);
+const relatedItems = related(resource, 6);
+
+// 정보 칸. 값이 없는 칸은 아예 만들지 않는다.
+// 기관과 발행일은 맨 위 밴드에 이미 있으므로 여기서 되풀이하지 않는다.
+const facts = [
+  { label: '학년', html: 'grades' },
+  { label: '교과', html: 'subjects' },
+  { label: '학교급', html: 'levels' },
+  { label: '자료 유형', value: resource.resourceType },
+  { label: '파일 형식', value: resource.fileFormats.join(', ') || null },
+  { label: '대상', value: resource.audiences.join(', ') || null },
+  { label: '이용 조건', value: resource.license },
+].filter((f) => {
+  if (f.html === 'grades') return resource.grades.length > 0;
+  if (f.html === 'subjects') return resource.subjects.length > 0;
+  if (f.html === 'levels') return resource.schoolLevels.length > 0;
+  return Boolean(f.html || f.value);
+});
+
+const description = resource.summary.length > 155
+  ? `${resource.summary.slice(0, 152)}…`
+  : resource.summary;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'LearningResource',
+      '@id': absolute(canonical),
+      name: resource.title,
+      description: resource.summary,
+      url: absolute(canonical),
+      inLanguage: 'ko',
+      ...(resource.publishedAt ? { datePublished: resource.publishedAt } : {}),
+      ...(resource.resourceType ? { learningResourceType: resource.resourceType } : {}),
+      ...(resource.schoolLevels.length ? { educationalLevel: resource.schoolLevels } : {}),
+      ...(resource.audiences.length
+        ? { audience: resource.audiences.map((a: string) => ({ '@type': 'EducationalAudience', educationalRole: a })) }
+        : {}),
+      about: resource.topics.map((t: string) => ({ '@type': 'Thing', name: t })),
+      ...(resource.tags.length ? { keywords: resource.tags.join(', ') } : {}),
+      ...(org
+        ? {
+            publisher: {
+              '@type': 'Organization',
+              name: org.name,
+              ...(org.homepage ? { url: org.homepage } : {}),
+            },
+          }
+        : {}),
+      ...(resource.license !== '미표기'
+        ? { license: `공공누리 ${resource.license}` }
+        : {}),
+      isBasedOn: resource.sourceUrl,
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: SITE_NAME, item: absolute('/') },
+        ...(resource.topics[0]
+          ? [{ '@type': 'ListItem', position: 2, name: resource.topics[0], item: absolute(topicUrl(resource.topics[0])) }]
+          : []),
+        { '@type': 'ListItem', position: resource.topics[0] ? 3 : 2, name: resource.title, item: absolute(canonical) },
+      ],
+    },
+  ],
+};
+---
+
+<Base
+  title={resource.title}
+  description={description}
+  canonical={canonical}
+  ogType="article"
+>
+  <script
+    slot="head"
+    type="application/ld+json"
+    is:inline
+    set:html={JSON.stringify(jsonLd)}
+  />
+
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      {resource.topics[0] && <li><a href={topicUrl(resource.topics[0])}>{resource.topics[0]}</a></li>}
+      <li aria-current="page">{resource.title}</li>
+    </ol>
+  </nav>
+
+  <article class="detail">
+    <div class="band">
+      <div class="band-cover">
+        <Cover resource={resource} org={org} size="lg" />
+      </div>
+
+      <div class="band-main">
+        <p class="band-meta">
+          {org ? <a href={orgUrl(org.code)}>{org.name}</a> : <span>{resource.orgCode}</span>}
+          {lineage.length > 1 && (
+            <span class="muted"> · {lineage.slice(0, -1).map((o: any) => o.shortName).join(' › ')} 소속</span>
+          )}
+          {resource.publishedAt && (
+            <>
+              <span aria-hidden="true"> · </span>
+              <time datetime={resource.publishedAt}>{formatDate(resource.publishedAt)}</time>
+            </>
+          )}
+        </p>
+
+        <h1>{resource.title}</h1>
+
+        <p class="band-cta">
+          <a
+            class="btn"
+            href={resource.sourceUrl}
+            rel="noopener nofollow"
+            target="_blank"
+            data-source-link
+            data-resource-id={resource.id}
+          >
+            {org ? `${org.shortName}에서 받기` : '원문 보러 가기'}
+            <span aria-hidden="true"> ↗</span>
+            <span class="visually-hidden">(새 창)</span>
+          </a>
+        </p>
+        <p class="band-note">
+          {resource.fileFormats.length > 0 && <>{resource.fileFormats.join(', ')} · </>}
+          온자료는 파일을 보관하지 않습니다
+          {resource.clicks > 0 && (
+            <> · 원문으로 <b>{resource.clicks.toLocaleString('ko-KR')}번</b> 이동했습니다</>
+          )}
+        </p>
+      </div>
+    </div>
+
+    <div class="cols">
+      <section class="col-sum" aria-labelledby="sum-h">
+        <h2 id="sum-h" class="col-h">무엇이 들어 있나요</h2>
+        <p class="detail-sum">{resource.summary}</p>
+      </section>
+
+      {resource.tip && (
+        <aside class="col-tip" aria-labelledby="tip-h">
+          <h2 id="tip-h" class="col-h col-h-go">언제 쓰나요</h2>
+          <p>{resource.tip}</p>
+        </aside>
+      )}
+    </div>
+
+    <h2 class="visually-hidden">자료 정보</h2>
+    <dl class="facts">
+      {facts.map((f) => (
+        <div class="fact">
+          <dt>{f.label}</dt>
+          <dd>
+            {f.html === 'grades' && (
+              <ul class="inline-links">
+                {resource.grades.map((g: string) => (
+                  <li><a href={gradeUrl(g)}>{GRADE_LABELS[g] ?? g}</a></li>
+                ))}
+              </ul>
+            )}
+            {f.html === 'subjects' && (
+              <ul class="inline-links">
+                {resource.subjects.map((sub: string) => (
+                  <li><a href={subjectUrl(sub)}>{sub}</a></li>
+                ))}
+              </ul>
+            )}
+            {f.html === 'levels' && (
+              <ul class="inline-links">
+                {resource.schoolLevels.map((l: string) => (
+                  <li><a href={levelUrl(l)}>{l}</a></li>
+                ))}
+              </ul>
+            )}
+            {!f.html && f.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+
+    <div class="detail-tax">
+      <h2 class="visually-hidden">분류</h2>
+      <ul class="chips">
+        {resource.topics.map((t: string) => (
+          <li><a class="chip" href={topicUrl(t)}>{t}</a></li>
+        ))}
+        {resource.tags.map((t: string) => (
+          <li><a class="chip chip-tag" href={tagUrl(t)}>#{t}</a></li>
+        ))}
+      </ul>
+    </div>
+
+    {resource.grades.length > 0 && resource.subjects.length > 0 && (
+      <p class="detail-cross">
+        비슷한 자료 더 보기:
+        {resource.grades.slice(0, 2).flatMap((g: string) =>
+          resource.subjects.slice(0, 2).map((sub: string) => (
+            <a class="chip chip-sm" href={gradeSubjectUrl(g, sub)}>
+              {GRADE_LABELS[g] ?? g} {sub}
+            </a>
+          ))
+        )}
+      </p>
+    )}
+
+    <p class="detail-source">
+      원문 주소: <a href={resource.sourceUrl} rel="noopener nofollow" class="src-url">{resource.sourceUrl}</a>
+      {resource.linkCheckedAt && (
+        <span class="muted"> · 링크 확인 {formatDate(resource.linkCheckedAt)}</span>
+      )}
+    </p>
+  </article>
+
+  {relatedItems.length > 0 && (
+    <section class="section" aria-labelledby="rel-h">
+      <div class="section-head">
+        <h2 id="rel-h">함께 보면 좋은 자료</h2>
+      </div>
+      <ul class="rlist">
+        {relatedItems.map((r: any) => (
+          <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} compact /></li>
+        ))}
+      </ul>
+    </section>
+  )}
+</Base>
+
+<style>
+  .detail {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.4rem 1.25rem 1.5rem;
+  }
+
+  /* --------------------------------------------------------- 상단 밴드 */
+  /* 표지·제목·받기 버튼을 한 덩어리로 묶는다. 페이지를 열자마자 "이게 무슨
+     자료이고 어디서 받는지"가 한 화면에 들어와야 한다. */
+  .band {
+    display: flex;
+    gap: 1.4rem;
+    align-items: flex-start;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1.4rem;
+  }
+  .band-cover { flex: none; line-height: 0; }
+  .band-main { min-width: 0; flex: 1; }
+
+  .band-meta {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .band-main h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    margin: 0 0 0.9rem;
+  }
+  .band-cta { margin: 0 0 0.45rem; }
+  .band-note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .band-note b { color: var(--go-dark); font-weight: 600; }
+
+  /* ------------------------------------------------- 요약 · 활용법 두 칸 */
+  .cols {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .col-h {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0 0 0.4rem;
+  }
+  .col-h-go { color: var(--go-dark); }
+  .detail-sum { margin: 0; font-size: 1.02rem; }
+
+  .col-tip {
+    background: var(--tint);
+    border-radius: var(--radius);
+    padding: 0.9rem 1.05rem;
+    align-self: start;
+  }
+  .col-tip p { margin: 0; }
+
+  /* --------------------------------------------------------- 정보 칸 */
+  /* grid 로 두면 마지막 줄에 빈 칸이 남아 회색 덩어리가 생긴다.
+     flex 는 남는 폭을 마지막 줄 칸들이 나눠 가지므로 그런 구멍이 없다. */
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 0 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .fact {
+    flex: 1 1 9rem;
+    background: var(--card);
+    padding: 0.7rem 0.85rem;
+    box-shadow: inset -1px -1px 0 0 var(--line);
+  }
+  .fact dt {
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 0.15rem;
+  }
+  .fact dd { margin: 0; font-size: 0.92rem; font-weight: 500; }
+
+  .inline-links {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0;
+    margin: 0;
+  }
+
+  .detail-tax { margin-bottom: 1.1rem; }
+  .detail-cross {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0 0 1.1rem;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+  .chip-tag { font-size: 0.8rem; color: var(--muted); }
+
+  .detail-source {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    border-top: 1px dashed var(--line);
+    padding-top: 0.8rem;
+  }
+  .src-url { word-break: break-all; }
+
+  @media (max-width: 40rem) {
+    .cols { grid-template-columns: 1fr; gap: 1.1rem; }
+  }
+
+  @media (max-width: 30rem) {
+    .band { gap: 1rem; }
+    .band-cover :global(.cover-lg) { width: 6.5rem; }
+  }
+</style>
+
+<script>
+  // 원문으로 넘어간 횟수를 남긴다.
+  // sendBeacon 은 페이지를 떠나도 요청이 살아남고, 이동을 늦추지 않는다.
+  // 실패하든 차단되든 링크 동작에는 아무 영향이 없어야 한다.
+  const link = document.querySelector<HTMLAnchorElement>('[data-source-link]');
+  const id = link?.dataset.resourceId;
+  if (link && id) {
+    link.addEventListener('click', () => {
+      try {
+        const body = new Blob([JSON.stringify({ id })], { type: 'application/json' });
+        navigator.sendBeacon?.('/api/click', body);
+      } catch {
+        /* 집계는 부가 기능이다. 사용자 흐름을 막지 않는다. */
+      }
+    });
+  }
+</script>

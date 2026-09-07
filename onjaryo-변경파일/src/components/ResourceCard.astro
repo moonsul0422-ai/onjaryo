@@ -1,0 +1,83 @@
+---
+// 목록 페이지 네 곳 + 홈 + 검색 결과에서 공유하는 카드.
+//
+// compact 는 표지 없이 제목·메타만 그린다. 검색 결과가 클라이언트에서
+// 같은 클래스 이름으로 이 형태를 다시 그리기 때문에, compact 마크업을 바꾸면
+// src/pages/search.astro 의 renderCard 도 같이 고쳐야 한다.
+// 표지가 붙는 큰 카드는 서버에서만 그리므로 그 제약을 받지 않는다.
+import Cover from './Cover.astro';
+import {
+  formatDateShort, formatGradeRange, resourceUrl, orgUrl, subjectUrl, topicUrl,
+} from '../lib/site.js';
+
+interface Props {
+  resource: any;
+  org?: any;
+  compact?: boolean;
+  headingLevel?: 2 | 3;
+}
+
+const { resource, org = null, compact = false, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}`;
+const orgLabel = org?.shortName ?? resource.orgCode;
+const gradeLabel = formatGradeRange(resource.grades);
+---
+
+<article class:list={['rcard', compact ? 'rcard-compact' : 'rcard-big']}>
+  {!compact && (
+    <a class="rcard-cover" href={resourceUrl(resource.id)} tabindex="-1" aria-hidden="true">
+      <Cover resource={resource} org={org} size="sm" />
+    </a>
+  )}
+
+  <div class="rcard-body">
+    <Heading class="rcard-title">
+      <a href={resourceUrl(resource.id)}>{resource.title}</a>
+    </Heading>
+
+    {!compact && resource.summary && <p class="rcard-sum">{resource.summary}</p>}
+
+    <p class="rcard-meta">
+      {org ? (
+        <a class="rcard-org" href={orgUrl(org.code)}>{orgLabel}</a>
+      ) : (
+        <span class="rcard-org">{orgLabel}</span>
+      )}
+      {resource.publishedAt && (
+        <>
+          <span aria-hidden="true">·</span>
+          <time datetime={resource.publishedAt}>{formatDateShort(resource.publishedAt)}</time>
+        </>
+      )}
+      {gradeLabel && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span class="rcard-grade">{gradeLabel}</span>
+        </>
+      )}
+      {resource.resourceType && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>{resource.resourceType}</span>
+        </>
+      )}
+    </p>
+
+    {(resource.subjects.length > 0 || resource.topics.length > 0) && (
+      <ul class="rcard-topics">
+        {resource.subjects.map((s: string) => (
+          <li><a class="chip chip-sm chip-subject" href={subjectUrl(s)}>{s}</a></li>
+        ))}
+        {resource.topics.map((t: string) => (
+          <li><a class="chip chip-sm" href={topicUrl(t)}>{t}</a></li>
+        ))}
+      </ul>
+    )}
+  </div>
+</article>
+
+<!--
+  카드 스타일은 Base.astro 의 전역 블록에 있다.
+  검색 결과는 이 컴포넌트를 거치지 않고 클라이언트에서 같은 마크업을 다시 그리는데,
+  스타일이 이 파일에 묶여 있으면 search.astro 에는 딸려 가지 않는다.
+-->

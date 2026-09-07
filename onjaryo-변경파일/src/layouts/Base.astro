@@ -1,0 +1,599 @@
+---
+import { SITE_NAME, SITE_URL, NAV, SITE_TAGLINE } from '../lib/site.js';
+import { meta } from '../lib/data.js';
+
+interface Props {
+  title: string;
+  description: string;
+  canonical: string;
+  ogType?: string;
+  ogImage?: string;
+  noindex?: boolean;
+  bodyClass?: string;
+}
+
+const {
+  title,
+  description,
+  canonical,
+  ogType = 'website',
+  ogImage = '/og-default.png',
+  noindex = false,
+  bodyClass = '',
+} = Astro.props;
+
+const canonicalUrl = new URL(canonical, SITE_URL).href;
+const ogImageUrl = new URL(ogImage, SITE_URL).href;
+const fullTitle = title === SITE_NAME ? title : `${title} · ${SITE_NAME}`;
+const path = Astro.url.pathname;
+const isSample = meta.source !== 'sheet';
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" type="application/xml" title="사이트맵" href="/sitemap.xml" />
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap"
+    />
+    <slot name="head" />
+  </head>
+
+  <body class={bodyClass || undefined}>
+    <a class="skip" href="#main">본문 바로가기</a>
+
+    <header class="site-head">
+      <div class="wrap head-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark" aria-hidden="true">온</span>
+          <span class="brand-text">
+            <strong>{SITE_NAME}</strong>
+            <span class="brand-tag">{SITE_TAGLINE}</span>
+          </span>
+        </a>
+        <nav aria-label="주요 메뉴">
+          <ul class="nav">
+            {NAV.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  aria-current={path === item.href || path.startsWith(`${item.href}/`) ? 'page' : undefined}
+                >{item.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="wrap">
+      <slot />
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap">
+        <p class="foot-lead">
+          {SITE_NAME}는 시·도교육청과 산하기관이 <strong>이미 공개한</strong> 자료를 찾아가는 길만 모읍니다.
+          파일을 보관하거나 다시 배포하지 않습니다.
+        </p>
+        <ul class="foot-nav">
+          <li><a href="/about">소개</a></li>
+          <li><a href="/submit">자료 제보</a></li>
+          <li><a href="/search">검색</a></li>
+          <li><a href="/sitemap.xml">사이트맵</a></li>
+        </ul>
+        <p class="foot-meta">
+          등록 자료 {meta.total.toLocaleString('ko-KR')}건 · 기관 {meta.orgCount}곳 ·
+          마지막 갱신 <time datetime={meta.syncedAt}>{meta.syncedAt.slice(0, 10)}</time>
+          {isSample && <span class="sample-flag">예시 데이터</span>}
+        </p>
+        <p class="foot-visits" id="foot-visits" hidden>
+          오늘 <b id="visits-today">–</b>명 · 누적 <b id="visits-total">–</b>명이 다녀갔습니다
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // 방문자 수. 서버가 세고 이 자리를 채운다.
+      // 카운터가 꺼져 있거나 요청이 실패하면 줄 자체를 띄우지 않는다.
+      // 숫자를 못 가져왔다고 "0명"을 보여 주면 거짓말이 된다.
+      (async () => {
+        const box = document.getElementById('foot-visits');
+        if (!box) return;
+        try {
+          const res = await fetch('/api/visit', { method: 'POST', cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (!data?.enabled) return;
+          const fmt = (n: number) => Number(n).toLocaleString('ko-KR');
+          document.getElementById('visits-today')!.textContent = fmt(data.today);
+          document.getElementById('visits-total')!.textContent = fmt(data.total);
+          box.hidden = false;
+        } catch {
+          /* 방문자 수는 있으면 좋은 것이지 없으면 안 되는 것이 아니다. */
+        }
+      })();
+    </script>
+
+    <style is:global>
+      :root {
+        --ink: #14213d;
+        --paper: #fbfbf9;
+        --line: #dfdfd6;
+        --muted: #67707f;
+        --go: #16624f;
+        --go-dark: #0f4a3b;
+
+        --card: #ffffff;
+        --tint: #f2f4f1;
+        --warn: #8a4b12;
+        --radius: 10px;
+        --wrap: 62rem;
+        --sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+          system-ui, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+        --serif: 'Gowun Batang', 'Nanum Myeongjo', serif;
+      }
+
+      *,
+      *::before,
+      *::after { box-sizing: border-box; }
+
+      /* .btn 이나 .filterbar 처럼 display 를 지정한 클래스가 UA 의 [hidden] 규칙을
+         이겨 버린다. hidden 을 토글해 여닫는 곳이 여럿이라 전역으로 못 박는다. */
+      [hidden] { display: none !important; }
+
+      html { -webkit-text-size-adjust: 100%; }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.7;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      main { flex: 1 0 auto; padding: 1.75rem 0 4rem; }
+
+      .wrap {
+        width: 100%;
+        max-width: var(--wrap);
+        margin-inline: auto;
+        padding-inline: 1rem;
+      }
+
+      a { color: var(--go-dark); text-underline-offset: 0.2em; }
+      a:hover { color: var(--go); }
+
+      :focus-visible {
+        outline: 3px solid var(--go);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      .skip {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        background: var(--go);
+        color: #fff;
+        padding: 0.6rem 1rem;
+        z-index: 20;
+      }
+      .skip:focus { left: 0; color: #fff; }
+
+      h1, h2, h3 { line-height: 1.35; margin: 0 0 0.6rem; }
+      h1 { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2rem); letter-spacing: -0.01em; }
+      h2 { font-size: clamp(1.15rem, 1.05rem + 0.5vw, 1.35rem); }
+      p { margin: 0 0 0.9rem; }
+      ul { padding-left: 1.1rem; }
+
+      img { max-width: 100%; height: auto; }
+
+      /* ---------------------------------------------------------- 헤더 */
+      .site-head {
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+      }
+      .head-inner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem 1rem;
+        padding-block: 0.7rem;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        text-decoration: none;
+        color: var(--ink);
+      }
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 8px;
+        background: var(--go);
+        color: #fff;
+        font-family: var(--serif);
+        font-size: 1.05rem;
+        flex: none;
+      }
+      .brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+      .brand-text strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+      .brand-tag { font-size: 0.72rem; color: var(--muted); }
+
+      .nav {
+        display: flex;
+        gap: 0.25rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        flex-wrap: wrap;
+      }
+      .nav a {
+        display: inline-block;
+        padding: 0.35rem 0.6rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.92rem;
+        color: var(--ink);
+      }
+      .nav a:hover { background: var(--tint); }
+      .nav a[aria-current='page'] { color: var(--go-dark); font-weight: 600; background: var(--tint); }
+
+      /* ---------------------------------------------------------- 푸터 */
+      .site-foot {
+        border-top: 1px solid var(--line);
+        background: var(--tint);
+        padding-block: 1.5rem 2.25rem;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+      .foot-lead { max-width: 46rem; }
+      .foot-lead strong { color: var(--ink); }
+      .foot-nav {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+        padding: 0;
+        margin: 0 0 0.6rem;
+      }
+      .foot-meta { margin: 0; font-variant-numeric: tabular-nums; }
+      .foot-visits {
+        margin: 0.25rem 0 0;
+        font-variant-numeric: tabular-nums;
+        font-size: 0.85rem;
+      }
+      .foot-visits b { color: var(--ink); font-weight: 600; }
+      .sample-flag {
+        display: inline-block;
+        margin-left: 0.4rem;
+        padding: 0.05rem 0.4rem;
+        border: 1px solid var(--warn);
+        border-radius: 999px;
+        color: var(--warn);
+        font-size: 0.75rem;
+      }
+
+      /* --------------------------------------------------------- 자료 카드 */
+      /* search.astro 가 클라이언트에서 같은 마크업을 다시 그린다. 여기 한 곳에 둔다. */
+      .rlist {
+      list-style: none;
+      display: grid;
+      gap: 0.85rem;
+      padding: 0;
+      margin: 0;
+      }
+
+      .rcard {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      }
+      .rcard:hover { border-color: #c9cdbf; }
+
+      /* 표지가 붙는 큰 카드. 목록 페이지의 기본 모양이다. */
+      .rcard-big {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+      }
+      .rcard-cover { flex: none; display: block; line-height: 0; text-decoration: none; }
+      .rcard-body { min-width: 0; flex: 1; }
+      .rcard-big .rcard-sum { -webkit-line-clamp: 3; line-clamp: 3; }
+
+      /* ------------------------------------------------------------ 표지 */
+      /* 표지는 자료 대부분에서 한동안 비어 있다. 비어도 목록이 멀쩡해야 한다. */
+      .cover {
+      display: block;
+      aspect-ratio: 3 / 4;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--tint);
+      object-fit: cover;
+      overflow: hidden;
+      }
+      .cover-sm { width: 5.75rem; }
+      .cover-md { width: 8rem; }
+      .cover-lg { width: 10rem; }
+
+      .cover-fb {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 0.35rem;
+      padding: 0.7rem 0.55rem 0.5rem;
+      text-align: center;
+      border-color: transparent;
+      background: hsl(var(--cover-h, 210) 34% 34%);
+      }
+      .cover-fb .cover-t {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 0.72rem;
+      line-height: 1.4;
+      color: #fff;
+      align-self: center;
+      word-break: keep-all;
+      }
+      .cover-fb .cover-o {
+      font-size: 0.56rem;
+      line-height: 1.3;
+      color: rgba(255, 255, 255, 0.82);
+      }
+      .cover-md.cover-fb .cover-t { font-size: 0.86rem; }
+      .cover-lg.cover-fb .cover-t { font-size: 1rem; }
+      .cover-lg.cover-fb .cover-o { font-size: 0.68rem; }
+
+      /* ------------------------------------------------- 과목 탭 (학년 페이지) */
+      /* 학년을 고른 다음의 유일한 다음 클릭지다. 학년 버튼보다 한 단계 크게 둔다. */
+      .subjtabs {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0;
+      margin: 0;
+      }
+      .subjtab {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      padding: 0.7rem 1.15rem;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--card);
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      }
+      .subjtab:hover { border-color: var(--go); color: var(--go-dark); }
+      .subjtab .n {
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      }
+      .subjtab[aria-current='page'] {
+      background: var(--go);
+      border-color: var(--go);
+      color: #fff;
+      }
+      .subjtab[aria-current='page'] .n { color: rgba(255, 255, 255, 0.75); }
+
+      .rcard-title {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.45;
+      margin: 0 0 0.35rem;
+      }
+      .rcard-title a {
+      color: var(--ink);
+      text-decoration: none;
+      }
+      .rcard-title a:hover { color: var(--go-dark); text-decoration: underline; }
+
+      .rcard-sum {
+      margin: 0 0 0.5rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      }
+
+      .rcard-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.32rem;
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      }
+      .rcard-meta .rcard-org { color: var(--go-dark); font-weight: 600; text-decoration: none; }
+      .rcard-meta a.rcard-org:hover { text-decoration: underline; }
+
+      .rcard-topics {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      padding: 0;
+      margin: 0.6rem 0 0;
+      }
+      .chip-sm { padding: 0.14rem 0.5rem; font-size: 0.78rem; }
+      .rcard-meta .rcard-grade { color: var(--ink); font-weight: 600; }
+      .chip-subject {
+      border-color: var(--go);
+      color: var(--go-dark);
+      font-weight: 600;
+      }
+
+      .rcard-compact { padding: 0.8rem 0.95rem; }
+      .rcard-compact .rcard-title { font-size: 1.02rem; }
+
+      /* ------------------------------------------------------ 공용 조각 */
+      .lede {
+        font-size: 1.02rem;
+        color: var(--muted);
+        max-width: 44rem;
+      }
+
+      .page-head { margin-bottom: 1.5rem; }
+      .page-head h1 { margin-bottom: 0.35rem; }
+
+      .crumbs {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        padding: 0;
+        margin: 0 0 0.6rem;
+        font-size: 0.83rem;
+        color: var(--muted);
+      }
+      .crumbs li + li::before { content: '›'; margin-right: 0.3rem; }
+
+      .chips {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        padding: 0;
+        margin: 0;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.3rem;
+        padding: 0.28rem 0.66rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 0.86rem;
+        white-space: nowrap;
+      }
+      .chip:hover { border-color: var(--go); color: var(--go-dark); }
+      .chip .n { font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .chip:hover .n { color: var(--go); }
+      .chip-big {
+        padding: 0.45rem 0.85rem;
+        font-size: 0.98rem;
+        font-weight: 600;
+      }
+      .chip-go { border-color: var(--go); color: var(--go-dark); font-weight: 600; }
+      .chip[aria-current='page'] { background: var(--go); border-color: var(--go); color: #fff; }
+      .chip[aria-current='page'] .n { color: rgba(255, 255, 255, 0.8); }
+
+      .btn {
+        display: inline-block;
+        padding: 0.55rem 1.1rem;
+        border-radius: 8px;
+        background: var(--go);
+        border: 1px solid var(--go);
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:hover { background: var(--go-dark); color: #fff; }
+      .btn-quiet {
+        background: var(--card);
+        color: var(--go-dark);
+        border-color: var(--line);
+        font-weight: 500;
+      }
+      .btn-quiet:hover { background: var(--tint); border-color: var(--go); color: var(--go-dark); }
+
+      .note {
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--go);
+        background: var(--card);
+        border-radius: var(--radius);
+        padding: 0.9rem 1.1rem;
+      }
+      .note :last-child { margin-bottom: 0; }
+
+      .section { margin-top: 2.25rem; }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.9rem;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 0.4rem;
+      }
+      .section-head h2 { margin: 0; }
+      .section-head a { font-size: 0.88rem; }
+
+      .muted { color: var(--muted); }
+      .visually-hidden {
+        position: absolute;
+        width: 1px; height: 1px;
+        margin: -1px; padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 26rem) {
+        .rcard-big { gap: 0.75rem; }
+        .rcard-big .cover-sm { width: 4.5rem; }
+        .subjtab { padding: 0.6rem 0.9rem; font-size: 0.95rem; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </body>
+</html>

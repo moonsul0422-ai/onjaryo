@@ -1,0 +1,104 @@
+---
+import Base from '../../layouts/Base.astro';
+import ResourceCard from '../../components/ResourceCard.astro';
+import GradeNav from '../../components/GradeNav.astro';
+import {
+  byGrade, byGradeSubject, gradeSubjectKey, orgByCode, subjectsOfGrade, usedGrades,
+} from '../../lib/data.js';
+import { GRADE_DESCRIPTIONS, GRADE_LABELS, byTopicOrder } from '../../lib/taxonomy.js';
+import { gradeUrl, gradeSubjectUrl, topicUrl } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  return usedGrades.map((grade) => ({
+    params: { grade },
+    props: { grade, items: byGrade.get(grade) },
+  }));
+}
+
+const { grade, items } = Astro.props;
+const label = GRADE_LABELS[grade] ?? grade;
+const description = GRADE_DESCRIPTIONS[grade];
+
+const subjects = subjectsOfGrade(grade);
+const topics = [...new Set(items.flatMap((r: any) => r.topics))].sort(byTopicOrder);
+const countByTopic = new Map<string, number>();
+for (const r of items) for (const t of r.topics) countByTopic.set(t, (countByTopic.get(t) ?? 0) + 1);
+
+const metaDescription = `${label} 교육자료 ${items.length}건. ${description}`.slice(0, 155);
+---
+
+<Base title={`${label} 교육자료`} description={metaDescription} canonical={gradeUrl(grade)}>
+  <nav aria-label="현재 위치">
+    <ol class="crumbs">
+      <li><a href="/">홈</a></li>
+      <li aria-current="page">{label}</li>
+    </ol>
+  </nav>
+
+  <header class="page-head">
+    <h1>{label}</h1>
+    <p class="lede">{description}</p>
+    <p class="count">자료 {items.length}건 · 과목 {subjects.length}개</p>
+  </header>
+
+  {subjects.length > 0 && (
+    <nav class="picknext" aria-labelledby="pick-subject">
+      <h2 id="pick-subject" class="picknext-h">과목을 고르면 더 좁혀집니다</h2>
+      <ul class="subjtabs">
+        <li><a class="subjtab" href={gradeUrl(grade)} aria-current="page">전체<span class="n">{items.length}</span></a></li>
+        {subjects.map((s: string) => (
+          <li>
+            <a class="subjtab" href={gradeSubjectUrl(grade, s)}>
+              {s}
+              <span class="n">{byGradeSubject.get(gradeSubjectKey(grade, s)).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <h2 class="visually-hidden">{label} 자료 목록</h2>
+  <ul class="rlist">
+    {items.map((r: any) => (
+      <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+    ))}
+  </ul>
+
+  {topics.length > 0 && (
+    <nav class="section" aria-label="주제로 좁히기">
+      <h2 class="picknext-h">주제로 보기</h2>
+      <ul class="chips">
+        {topics.map((t: string) => (
+          <li><a class="chip chip-sm" href={topicUrl(t)}>{t}<span class="n">{countByTopic.get(t)}</span></a></li>
+        ))}
+      </ul>
+    </nav>
+  )}
+
+  <div class="section">
+    <GradeNav current={grade} heading="다른 학년 보기" headingId="other-grades" />
+  </div>
+</Base>
+
+<style>
+  .count {
+    margin: 0.6rem 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  /* 과목 탭은 학년 페이지에서 가장 중요한 다음 클릭지다.
+     목록보다 먼저 눈에 들어오도록 아래에 선을 그어 구역을 나눈다. */
+  .picknext {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .picknext-h {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.7rem;
+  }
+</style>

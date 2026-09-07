@@ -1,0 +1,112 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+import GradeNav from '../components/GradeNav.astro';
+import { meta } from '../lib/data.js';
+import { SITE_DESCRIPTION, SITE_NAME, formatDate } from '../lib/site.js';
+
+// 첫 화면에는 학년만 둔다.
+// 과목·주제·기관은 학년을 고른 다음 화면에서 만난다. 처음부터 셋을 다 펼치면
+// 고를 것이 너무 많아져서, 정작 첫 클릭이 늦어진다.
+---
+
+<Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
+  <section class="hero">
+    <h1>몇 학년, 무슨 과목인지만 고르세요</h1>
+    <p class="hero-lede">
+      전국 교육청이 공개한 수업자료를 학년과 과목으로 정리했습니다.
+      찾은 자료는 <b>발행한 교육청 사이트에서 그대로</b> 내려받습니다.
+    </p>
+    <SearchBox id="q-home" size="lg" label="자료 검색" placeholder="예: 초3 분수, 안전교육 활동지" />
+  </section>
+
+  <section class="pick" aria-labelledby="grade-h">
+    <h2 id="grade-h" class="pick-h">학년으로 찾기</h2>
+    <GradeNav big />
+  </section>
+
+  <p class="more">
+    학년이 정해지지 않았다면 <a href="/search">전체 검색</a>에서 과목·주제·기관으로 좁혀 볼 수 있습니다.
+  </p>
+
+  <section class="stats" aria-labelledby="stats-h">
+    <h2 id="stats-h" class="visually-hidden">등록 현황</h2>
+    <dl class="statlist">
+      <div>
+        <dt>등록 자료</dt>
+        <dd>{meta.total.toLocaleString('ko-KR')}건</dd>
+      </div>
+      <div>
+        <dt>기관</dt>
+        <dd>{meta.orgCount}곳</dd>
+      </div>
+      <div>
+        <dt>마지막 갱신</dt>
+        <dd><time datetime={meta.syncedAt}>{formatDate(meta.syncedAt.slice(0, 10))}</time></dd>
+      </div>
+    </dl>
+    <p class="stats-note">
+      자료 목록은 매일 한 번 갱신됩니다. 빠진 자료가 있다면 <a href="/submit">제보</a>해 주세요.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    padding: 2rem 0 0.5rem;
+    max-width: 42rem;
+  }
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.3rem);
+    margin-bottom: 0.5rem;
+  }
+  .hero-lede {
+    color: var(--muted);
+    font-size: 1.02rem;
+    margin-bottom: 1.1rem;
+  }
+  .hero-lede b { color: var(--ink); font-weight: 600; }
+
+  .pick {
+    margin-top: 2.5rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.15rem 1.2rem 1.25rem;
+  }
+  .pick-h {
+    font-size: 0.9rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 0.85rem;
+  }
+
+  .more {
+    margin: 1.1rem 0 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .stats { margin-top: 2.5rem; }
+  .statlist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 2rem;
+    margin: 0 0 0.7rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .statlist > div { display: flex; flex-direction: column; }
+  .statlist dt { font-size: 0.78rem; color: var(--muted); }
+  .statlist dd {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats-note { margin: 0; font-size: 0.85rem; color: var(--muted); }
+</style>
