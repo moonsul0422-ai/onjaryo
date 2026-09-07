@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import SearchBox from '../components/SearchBox.astro';
+import GradeNav from '../components/GradeNav.astro';
+import { bySubject, usedSubjects } from '../lib/data.js';
+import { SITE_NAME, subjectUrl } from '../lib/site.js';
+---
+
+<Base
+  title="찾는 페이지가 없습니다"
+  description={`${SITE_NAME}에서 찾는 주소를 찾지 못했습니다. 학년과 과목으로 자료를 찾아보세요.`}
+  canonical="/404/"
+  noindex
+>
+  <header class="page-head">
+    <h1>찾는 페이지가 없습니다</h1>
+    <p class="lede">
+      주소가 잘못되었거나, 그 사이 자료가 내려갔을 수 있습니다.
+      아래에서 다시 찾아보세요.
+    </p>
+  </header>
+
+  <SearchBox id="q-404" size="lg" label="자료 검색" placeholder="예: 초3 분수, 안전교육 활동지" />
+
+  <section class="section pick" aria-labelledby="g404">
+    <div class="section-head"><h2 id="g404">학년으로 찾기</h2></div>
+    <GradeNav big />
+  </section>
+
+  <section class="section pick" aria-labelledby="s404">
+    <div class="section-head"><h2 id="s404">과목으로 찾기</h2></div>
+    <ul class="chips">
+      {usedSubjects.map((s: string) => (
+        <li>
+          <a class="chip chip-big" href={subjectUrl(s)}>
+            {s}<span class="n">{bySubject.get(s).length}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <p class="section muted">
+    링크가 끊긴 것 같다면 <a href="/submit">알려 주세요</a>. 확인해서 새 주소로 고치겠습니다.
+  </p>
+</Base>
+
+<style>
+  .pick {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem 1.1rem;
+  }
+  .pick .section-head { margin-bottom: 0.8rem; }
+</style>
