@@ -40,7 +40,6 @@ npm run dev        # sync 후 개발 서버
 | `SHEET_RESOURCES_GID` | 자료 탭 gid (기본 `0`) |
 | `SHEET_ORGS_GID` | 기관 탭 gid. 비우면 시트명 `organizations`로 찾는다 |
 | `SITE_URL` | 배포 도메인. 사이트맵·canonical·OG에 쓰인다 |
-| `PUBLIC_SUBMIT_FORM_URL` | 제보용 구글 폼 주소. 비우면 제보 페이지가 메일 안내로 바뀐다 |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | 조회 카운터 저장소. 없으면 카운터가 조용히 꺼진다 |
 
 `SITE_URL`을 바꿀 때는 `public/robots.txt`의 `Sitemap:` 줄도 같이 고친다.
@@ -104,7 +103,7 @@ npm run dev        # sync 후 개발 서버
 
 1. 저장소를 Vercel 프로젝트에 연결한다. 프레임워크 프리셋은 Astro,
    빌드 명령은 `npm run build`, 출력은 `dist` (`vercel.json`에 적혀 있다).
-2. 프로젝트 환경변수에 `SHEET_ID`, `SITE_URL`, 필요하면 `PUBLIC_SUBMIT_FORM_URL`을 넣는다.
+2. 프로젝트 환경변수에 `SHEET_ID`, `SITE_URL`을 넣는다.
    조회 카운터를 쓰려면 Storage 탭에서 Upstash Redis를 연동한다(위 절 참고).
 3. Settings → Git → Deploy Hooks 에서 훅을 만들고, 그 URL을 GitHub 저장소
    secret `VERCEL_DEPLOY_HOOK_URL`에 넣는다.

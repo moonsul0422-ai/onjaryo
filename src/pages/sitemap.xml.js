@@ -26,7 +26,6 @@ function buildEntries(siteUrl) {
   add('/', syncDate, 'daily', '1.0');
   add('/search/', syncDate, 'weekly', '0.6');
   add('/about/', syncDate, 'monthly', '0.4');
-  add('/submit/', syncDate, 'monthly', '0.4');
 
   for (const r of resources) {
     add(resourceUrl(r.id), r.publishedAt, 'yearly', '0.8');

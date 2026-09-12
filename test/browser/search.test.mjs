@@ -124,7 +124,7 @@ const page4 = await newPage(ctx);
 await page4.goto(`${BASE}/search/?q=${encodeURIComponent('존재하지않는낱말xyz')}`, { waitUntil: 'networkidle' });
 await page4.waitForSelector('#empty-box:not([hidden])', { timeout: 5000 });
 const emptyText = await page4.locator('#empty-box').innerText();
-assert.ok(emptyText.includes('제보'), '빈 결과에 제보 안내가 있다');
+assert.ok(/다시 찾아|훑어/.test(emptyText), '빈 결과에 다시 찾는 방법 안내가 있다');
 assert.ok(await page4.locator('.topicnav a').count() >= 20, '빈 결과에서도 영역 목록이 보인다');
 console.log('빈 결과 안내:', emptyText.split('\n')[0]);
 
