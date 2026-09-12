@@ -363,19 +363,30 @@ async function loadSources() {
     };
   }
   try {
-    console.log(`  시트 ${SHEET_ID} 에서 가져옵니다.`);
-    const resourcesCsv = await fetchCsv(gvizUrl(RESOURCES_GID, 'resources'));
-    const orgsCsv = await fetchCsv(gvizUrl(ORGS_GID, 'organizations'));
-    return { source: 'sheet', resourcesCsv, orgsCsv };
+  console.log(`  시트 ${SHEET_ID} 에서 가져옵니다.`);
+  let resourcesCsv;
+  try {
+    resourcesCsv = await fetchCsv(gvizUrl(RESOURCES_GID, 'resources'));
   } catch (err) {
-    warn(`시트를 읽지 못했습니다 (${err.message}). 시드 데이터로 대체합니다.`);
+    warn(`자료 탭을 읽지 못했습니다 (${err.message}). 시드 데이터로 대체합니다.`);
     return {
       source: 'seed-fallback',
       resourcesCsv: await readSeed('resources.csv'),
       orgsCsv: await readSeed('organizations.csv'),
     };
   }
-}
+
+  let orgsCsv;
+  try {
+    orgsCsv = await fetchCsv(gvizUrl(ORGS_GID, 'organizations'));
+  } catch (err) {
+    // 기관 탭은 선택 사항이다. 기관 탭이 없어도 자료 탭의 전체 행은 보존한다.
+    warn(`기관 탭을 읽지 못했습니다 (${err.message}). 시드 기관 목록으로 보완합니다.`);
+    orgsCsv = await readSeed('organizations.csv');
+    return { source: 'sheet-resources-seed-orgs', resourcesCsv, orgsCsv };
+  }
+
+  return { source: 'sheet', resourcesCsv, orgsCsv };
 
 /* -------------------------------------------------------------------- 실행 */
 
