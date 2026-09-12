@@ -8,8 +8,12 @@
 //   SHEET_RESOURCES_GID   자료 탭 gid (기본 0)
 //   SHEET_ORGS_GID        기관 탭 gid (없으면 시트명 "organizations" 로 시도)
 //
-// SHEET_ID 가 없거나 네트워크가 막히면 scripts/seed/*.csv 로 빌드한다.
-// 빌드가 시트 상태에 인질로 잡히지 않게 하기 위함이다.
+// SHEET_ID 가 없으면(로컬 개발) scripts/seed/*.csv 로 빌드한다.
+// SHEET_ID 를 줬는데 시트를 못 읽으면 빌드를 세운다. 시드로 갈아 끼우고
+// 빌드를 성공시키면 사이트는 멀쩡해 보이면서 내용만 예시 41건으로 바뀌어,
+// "시트에 써도 안 바뀐다" 로만 보인다. 실제로 그렇게 시간을 날린 적이 있다.
+// Vercel 은 빌드 실패 시 마지막 성공 배포를 계속 내보내므로 사이트는 죽지 않는다.
+// 정말 시드로라도 빌드해야 하면 ALLOW_SEED_FALLBACK=1.
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -31,6 +35,10 @@ const SHEET_ID = process.env.SHEET_ID?.trim() || '';
 const RESOURCES_GID = process.env.SHEET_RESOURCES_GID?.trim() || '0';
 const ORGS_GID = process.env.SHEET_ORGS_GID?.trim() || '';
 const FETCH_TIMEOUT_MS = Number(process.env.SHEET_TIMEOUT_MS || 20000);
+// 시트를 못 읽을 때 시드로 조용히 넘어갈지. 기본은 넘어가지 않는다.
+const ALLOW_SEED_FALLBACK = /^(1|true|yes)$/i.test(process.env.ALLOW_SEED_FALLBACK || '');
+// Vercel 은 빌드 중 VERCEL=1 을 심는다. 배포인지 로컬인지 구분하는 데 쓴다.
+const IS_DEPLOY = Boolean(process.env.VERCEL || process.env.CI_DEPLOY);
 
 const warnings = [];
 const warn = (msg) => { warnings.push(msg); console.warn(`  ! ${msg}`); };
@@ -368,8 +376,33 @@ async function readSeed(name) {
   return readFile(path, 'utf8');
 }
 
+/** 시트를 못 읽었을 때 사람이 바로 손댈 수 있게 쓰는 안내문. */
+function sheetHelp(reason) {
+  return [
+    `시트를 읽지 못했습니다: ${reason}`,
+    '',
+    '  확인할 것',
+    '  1. 시트 공유가 "링크가 있는 모든 사용자"인지.',
+    '     비공개면 CSV 대신 구글 로그인 HTML 이 돌아옵니다.',
+    '  2. SHEET_ID 가 맞는지 — 시트 주소의 /d/ 와 그다음 / 사이 문자열.',
+    `     지금 값: ${SHEET_ID || '(비어 있음)'}`,
+    `  3. 자료 탭 gid 가 SHEET_RESOURCES_GID 와 맞는지 (지금 값: ${RESOURCES_GID}).`,
+    '     탭을 여러 개 만들었다면 자료 탭이 gid=0 이 아닐 수 있습니다.',
+    '',
+    '  시트를 못 읽어도 시드로 빌드하려면 ALLOW_SEED_FALLBACK=1 을 설정하세요.',
+    '  (권장하지 않습니다. 사이트가 예시 41건짜리로 조용히 바뀝니다.)',
+  ].join('\n');
+}
+
 async function loadSources() {
   if (!SHEET_ID) {
+    if (IS_DEPLOY) {
+      // 배포인데 시트가 안 걸려 있으면 예시 데이터로 사이트가 나간다.
+      // 조용히 넘어가면 "시트에 써도 안 바뀐다" 로만 보인다.
+      warn('SHEET_ID 가 없는 채로 배포 빌드를 돌리고 있습니다.');
+      warn('이대로 배포하면 사이트에 예시 자료만 올라갑니다.');
+      warn('Vercel → Settings → Environment Variables 에 SHEET_ID 를 넣고 다시 배포하세요.');
+    }
     console.log('  SHEET_ID 가 없습니다. scripts/seed/*.csv 로 빌드합니다.');
     return {
       source: 'seed',
@@ -385,7 +418,12 @@ async function loadSources() {
   try {
     resourcesCsv = await fetchCsv(gvizUrl(RESOURCES_GID, 'resources'));
   } catch (err) {
-    warn(`자료 탭을 읽지 못했습니다 (${err.message}). 시드 데이터로 대체합니다.`);
+    // SHEET_ID 를 준 건 "시트를 쓰겠다" 는 뜻이다. 못 읽었는데 시드로 갈아 끼우고
+    // 빌드를 성공시키면 사이트는 멀쩡해 보이면서 내용만 예시로 바뀐다.
+    // 차라리 빌드를 세운다 — Vercel 은 마지막 성공 배포를 계속 내보내므로
+    // 사이트가 죽지도 않고, 실패는 눈에 보인다.
+    if (!ALLOW_SEED_FALLBACK) throw new Error(sheetHelp(err.message));
+    warn(`자료 탭을 읽지 못했습니다 (${err.message}). ALLOW_SEED_FALLBACK 이라 시드로 대체합니다.`);
     return {
       source: 'seed-fallback',
       resourcesCsv: await readSeed('resources.csv'),
