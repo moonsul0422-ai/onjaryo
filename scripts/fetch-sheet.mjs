@@ -35,6 +35,15 @@ const FETCH_TIMEOUT_MS = Number(process.env.SHEET_TIMEOUT_MS || 20000);
 const warnings = [];
 const warn = (msg) => { warnings.push(msg); console.warn(`  ! ${msg}`); };
 
+// 어떤 이유로 몇 행이 빠졌는지 센다. "시트에 쓴 게 다 안 올라온다" 를
+// 사람이 로그에서 바로 알아볼 수 있어야 한다.
+const dropCounts = new Map();
+const drop = (reason, msg) => {
+  dropCounts.set(reason, (dropCounts.get(reason) ?? 0) + 1);
+  if (msg) warn(msg);
+  return null;
+};
+
 /* ------------------------------------------------------------------ CSV */
 
 /** RFC4180 CSV 파서. 따옴표 안의 쉼표·줄바꿈·이중따옴표를 모두 처리한다. */
@@ -205,22 +214,26 @@ function normalizeResource(rec, index, orgIndex) {
 
   const rowRef = `행 ${index + 2}`;
   const status = clean(raw.status).toLowerCase();
-  if (status && /^(비공개|보류|draft|hidden|no|x|false)$/.test(status)) return null;
+  if (status && /^(비공개|보류|draft|hidden|no|x|false)$/.test(status)) {
+    return drop('status 가 비공개'); // 의도한 것이므로 경고는 남기지 않는다
+  }
 
   const id = clean(raw.id).toLowerCase();
   const title = clean(raw.title);
   if (!id && !title) return null; // 진짜 빈 줄
 
-  if (!id) { warn(`${rowRef} "${title}": id 가 비어 있어 제외합니다`); return null; }
-  if (!ID_RE.test(id)) { warn(`${rowRef} "${id}": id 는 소문자·숫자·하이픈만 씁니다. 제외합니다`); return null; }
-  if (!title) { warn(`${rowRef} (${id}): 제목이 비어 있어 제외합니다`); return null; }
+  if (!id) return drop('id 없음', `${rowRef} "${title}": id 가 비어 있어 제외합니다`);
+  if (!ID_RE.test(id)) {
+    return drop('id 형식 오류', `${rowRef} "${id}": id 는 소문자·숫자·하이픈만 씁니다. 제외합니다`);
+  }
+  if (!title) return drop('제목 없음', `${rowRef} (${id}): 제목이 비어 있어 제외합니다`);
 
   // 수용 기준: 요약이 비어 있는 자료는 산출물에 넣지 않는다.
   const summary = clean(raw.summary);
-  if (!summary) { warn(`${rowRef} (${id}) "${title}": 요약이 비어 제외합니다`); return null; }
+  if (!summary) return drop('요약 없음', `${rowRef} (${id}) "${title}": 요약이 비어 제외합니다`);
 
   const sourceUrl = normalizeUrl(raw.sourceUrl, `${rowRef} (${id})`);
-  if (!sourceUrl) { warn(`${rowRef} (${id}): 원문 링크가 없어 제외합니다`); return null; }
+  if (!sourceUrl) return drop('원문 링크 없음', `${rowRef} (${id}): 원문 링크가 없어 제외합니다`);
 
   const orgCode = clean(raw.orgCode).toLowerCase();
   if (!orgCode) warn(`${rowRef} (${id}): 기관코드가 비어 있습니다`);
@@ -231,7 +244,9 @@ function normalizeResource(rec, index, orgIndex) {
     warn(`${rowRef} (${id}): 정의되지 않은 영역 "${t}" — 무시합니다`);
     return false;
   });
-  if (topics.length === 0) { warn(`${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`); return null; }
+  if (topics.length === 0) {
+    return drop('주제 없음', `${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`);
+  }
 
   const grades = [...new Set(
     splitList(raw.grades)
@@ -362,8 +377,10 @@ async function loadSources() {
       orgsCsv: await readSeed('organizations.csv'),
     };
   }
-  try {
   console.log(`  시트 ${SHEET_ID} 에서 가져옵니다.`);
+
+  // 자료 탭과 기관 탭을 따로 받는다. 둘을 한 try 로 묶으면 기관 탭이 실패할 때
+  // 멀쩡히 읽은 자료까지 통째로 시드로 되돌아간다.
   let resourcesCsv;
   try {
     resourcesCsv = await fetchCsv(gvizUrl(RESOURCES_GID, 'resources'));
@@ -387,6 +404,7 @@ async function loadSources() {
   }
 
   return { source: 'sheet', resourcesCsv, orgsCsv };
+}
 
 /* -------------------------------------------------------------------- 실행 */
 
@@ -403,10 +421,14 @@ async function main() {
 
   const seen = new Set();
   const resources = [];
-  toRecords(resourcesCsv).forEach((rec, i) => {
+  const resourceRows = toRecords(resourcesCsv);
+  resourceRows.forEach((rec, i) => {
     const r = normalizeResource(rec, i, orgIndex);
     if (!r) return;
-    if (seen.has(r.id)) { warn(`중복 id "${r.id}" — 뒤에 나온 행을 버립니다`); return; }
+    if (seen.has(r.id)) {
+      drop('중복 id', `중복 id "${r.id}" — 뒤에 나온 행을 버립니다`);
+      return;
+    }
     seen.add(r.id);
     resources.push(r);
   });
@@ -454,7 +476,20 @@ async function main() {
   await writeFile(resolve(OUT_DIR, 'organizations.json'), JSON.stringify(orgs, null, 2) + '\n');
   await writeFile(resolve(OUT_DIR, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
 
-  console.log(`[sync] 자료 ${resources.length}건 / 기관 ${orgs.length}곳 · 경고 ${warnings.length}건 (source=${source})`);
+  const droppedTotal = [...dropCounts.values()].reduce((a, b) => a + b, 0);
+  console.log(
+    `[sync] 자료 탭 ${resourceRows.length}행 → ${resources.length}건 등록` +
+      (droppedTotal ? ` · ${droppedTotal}건 제외` : '') +
+      ` / 기관 ${orgs.length}곳 (source=${source})`
+  );
+  if (droppedTotal > 0) {
+    const detail = [...dropCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, n]) => `${reason} ${n}`)
+      .join(' · ');
+    console.log(`[sync] 제외 사유: ${detail}`);
+    console.log('[sync] 위 "!" 줄에 어느 행인지 적혀 있습니다.');
+  }
 
   if (resources.length === 0) {
     console.error('[sync] 자료가 0건입니다. 빌드를 중단합니다.');

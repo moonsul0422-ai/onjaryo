@@ -26,7 +26,9 @@ const canonicalUrl = new URL(canonical, SITE_URL).href;
 const ogImageUrl = new URL(ogImage, SITE_URL).href;
 const fullTitle = title === SITE_NAME ? title : `${title} · ${SITE_NAME}`;
 const path = Astro.url.pathname;
-const isSample = meta.source !== 'sheet';
+// 자료가 실제 시트에서 온 경우에는 배지를 달지 않는다.
+// 기관 탭만 시드로 보완된 경우(sheet-resources-seed-orgs)에도 자료 자체는 진짜다.
+const isSample = meta.source === 'seed' || meta.source === 'seed-fallback';
 ---
 
 <html lang="ko">
