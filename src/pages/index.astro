@@ -2,12 +2,17 @@
 import Base from '../layouts/Base.astro';
 import SearchBox from '../components/SearchBox.astro';
 import GradeNav from '../components/GradeNav.astro';
-import { meta } from '../lib/data.js';
+import ResourceCard from '../components/ResourceCard.astro';
+import { meta, orgByCode, recent } from '../lib/data.js';
 import { SITE_DESCRIPTION, SITE_NAME, formatDate } from '../lib/site.js';
 
-// 첫 화면에는 학년만 둔다.
-// 과목·주제·기관은 학년을 고른 다음 화면에서 만난다. 처음부터 셋을 다 펼치면
-// 고를 것이 너무 많아져서, 정작 첫 클릭이 늦어진다.
+// 고르는 길은 학년 하나만 둔다.
+// 과목·주제·기관 칩을 처음부터 다 펼치면 고를 것이 많아져 첫 클릭이 늦어진다.
+// 과목은 학년을 고른 다음 화면에서, 나머지는 검색에서 만난다.
+//
+// 대신 최근 등록은 표지와 함께 그대로 둔다. 학년 버튼만 놓인 첫 화면은 여기에
+// 무엇이 있는 곳인지 보여 주지 못한다. 표지가 붙은 자료 몇 건이 그 일을 한다.
+const latest = recent(10);
 ---
 
 <Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
@@ -28,6 +33,17 @@ import { SITE_DESCRIPTION, SITE_NAME, formatDate } from '../lib/site.js';
   <p class="more">
     학년이 정해지지 않았다면 <a href="/search">전체 검색</a>에서 과목·주제·기관으로 좁혀 볼 수 있습니다.
   </p>
+
+  <section class="section" aria-labelledby="recent-h">
+    <div class="section-head">
+      <h2 id="recent-h">최근 등록</h2>
+    </div>
+    <ul class="rlist">
+      {latest.map((r: any) => (
+        <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+      ))}
+    </ul>
+  </section>
 
   <section class="stats" aria-labelledby="stats-h">
     <h2 id="stats-h" class="visually-hidden">등록 현황</h2>
