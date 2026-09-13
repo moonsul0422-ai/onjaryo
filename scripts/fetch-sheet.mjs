@@ -236,6 +236,21 @@ function pick(rec, aliases) {
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// 시트에 흔히 적히는 줄임말을 정식 명칭으로 바꾼다.
+// taxonomy 의 값은 그대로 URL 이 되므로 값 자체를 늘리지 않고 여기서만 흡수한다.
+// 이게 없으면 "실과" 라고 적은 줄은 교과가 통째로 비어서 과목 페이지에 안 나온다.
+const SUBJECT_SYNONYMS = {
+  '실과': '실과·기술가정', '기술가정': '실과·기술가정', '기술·가정': '실과·기술가정',
+  '통합': '통합교과', '바슬즐': '통합교과',
+  '창체': '창의적 체험활동', '창의적체험활동': '창의적 체험활동',
+};
+const LEVEL_SYNONYMS = {
+  '유치원': '유아', '초등학교': '초등', '중학교': '중학',
+  '중등': '중학', '고등': '고교', '고등학교': '고교', '고등학교과정': '고교',
+};
+const asSubject = (v) => SUBJECT_SYNONYMS[v] ?? v;
+const asLevel = (v) => LEVEL_SYNONYMS[v] ?? v;
+
 function normalizeResource(rec, index, orgIndex) {
   const raw = {};
   for (const [field, aliases] of Object.entries(FIELD_ALIASES)) raw[field] = pick(rec, aliases);
@@ -284,13 +299,15 @@ function normalizeResource(rec, index, orgIndex) {
       .filter(Boolean)
   )].sort(byGradeOrder);
 
-  const subjects = [...new Set(splitListKeepDot(raw.subjects).filter((v) => {
+  const subjects = [...new Set(splitListKeepDot(raw.subjects).map(asSubject).filter((v) => {
+    if (!v) return false;
     if (isSubject(v)) return true;
     warn(`${rowRef} (${id}): 정의되지 않은 교과 "${v}" — 무시합니다`);
     return false;
   }))].sort(bySubjectOrder);
 
-  let schoolLevels = splitList(raw.schoolLevels).filter((v) => {
+  let schoolLevels = splitList(raw.schoolLevels).map(asLevel).filter((v) => {
+    if (!v) return false;
     if (isLevel(v)) return true;
     warn(`${rowRef} (${id}): 정의되지 않은 학교급 "${v}" — 무시합니다`);
     return false;
