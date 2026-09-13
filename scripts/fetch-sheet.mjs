@@ -35,6 +35,15 @@ const FETCH_TIMEOUT_MS = Number(process.env.SHEET_TIMEOUT_MS || 20000);
 const warnings = [];
 const warn = (msg) => { warnings.push(msg); console.warn(`  ! ${msg}`); };
 
+// 시트에 90줄을 넣었는데 40줄만 올라가면, 사람은 "왜 안 올라갔지" 가 아니라
+// "사이트가 고장났나" 를 먼저 의심한다. 버린 줄을 이유별로 세어서 끝에 알려 준다.
+const dropped = new Map();
+const drop = (reason, msg) => {
+  dropped.set(reason, (dropped.get(reason) ?? 0) + 1);
+  if (msg) warn(msg);
+  return null;
+};
+
 /* ------------------------------------------------------------------ CSV */
 
 /** RFC4180 CSV 파서. 따옴표 안의 쉼표·줄바꿈·이중따옴표를 모두 처리한다. */
@@ -233,22 +242,25 @@ function normalizeResource(rec, index, orgIndex) {
 
   const rowRef = `행 ${index + 2}`;
   const status = clean(raw.status).toLowerCase();
-  if (status && /^(비공개|보류|draft|hidden|no|x|false)$/.test(status)) return null;
+  // 일부러 감춘 줄이라 행마다 경고하지는 않는다. 다만 몇 줄인지는 끝에 알려 준다.
+  if (status && /^(비공개|보류|draft|hidden|no|x|false)$/.test(status)) {
+    return drop(`상태가 "${status}"`, null);
+  }
 
   const id = clean(raw.id).toLowerCase();
   const title = clean(raw.title);
   if (!id && !title) return null; // 진짜 빈 줄
 
-  if (!id) { warn(`${rowRef} "${title}": id 가 비어 있어 제외합니다`); return null; }
-  if (!ID_RE.test(id)) { warn(`${rowRef} "${id}": id 는 소문자·숫자·하이픈만 씁니다. 제외합니다`); return null; }
-  if (!title) { warn(`${rowRef} (${id}): 제목이 비어 있어 제외합니다`); return null; }
+  if (!id) return drop('id 없음', `${rowRef} "${title}": id 가 비어 있어 제외합니다`);
+  if (!ID_RE.test(id)) return drop('id 형식', `${rowRef} "${id}": id 는 소문자·숫자·하이픈만 씁니다. 제외합니다`);
+  if (!title) return drop('제목 없음', `${rowRef} (${id}): 제목이 비어 있어 제외합니다`);
 
   // 수용 기준: 요약이 비어 있는 자료는 산출물에 넣지 않는다.
   const summary = clean(raw.summary);
-  if (!summary) { warn(`${rowRef} (${id}) "${title}": 요약이 비어 제외합니다`); return null; }
+  if (!summary) return drop('요약 없음', `${rowRef} (${id}) "${title}": 요약이 비어 제외합니다`);
 
   const sourceUrl = normalizeUrl(raw.sourceUrl, `${rowRef} (${id})`);
-  if (!sourceUrl) { warn(`${rowRef} (${id}): 원문 링크가 없어 제외합니다`); return null; }
+  if (!sourceUrl) return drop('원문 링크 없음', `${rowRef} (${id}): 원문 링크가 없어 제외합니다`);
 
   const orgCode = clean(raw.orgCode).toLowerCase();
   if (!orgCode) warn(`${rowRef} (${id}): 기관코드가 비어 있습니다`);
@@ -259,7 +271,7 @@ function normalizeResource(rec, index, orgIndex) {
     warn(`${rowRef} (${id}): 정의되지 않은 영역 "${t}" — 무시합니다`);
     return false;
   });
-  if (topics.length === 0) { warn(`${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`); return null; }
+  if (topics.length === 0) return drop('영역 없음', `${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`);
 
   const grades = [...new Set(
     splitList(raw.grades)
@@ -421,10 +433,11 @@ async function main() {
 
   const seen = new Set();
   const resources = [];
-  toRecords(resourcesCsv).forEach((rec, i) => {
+  const rows = toRecords(resourcesCsv);
+  rows.forEach((rec, i) => {
     const r = normalizeResource(rec, i, orgIndex);
     if (!r) return;
-    if (seen.has(r.id)) { warn(`중복 id "${r.id}" — 뒤에 나온 행을 버립니다`); return; }
+    if (seen.has(r.id)) { drop('중복 id', `중복 id "${r.id}" — 뒤에 나온 행을 버립니다`); return; }
     seen.add(r.id);
     resources.push(r);
   });
@@ -473,6 +486,16 @@ async function main() {
   await writeFile(resolve(OUT_DIR, 'meta.json'), JSON.stringify(meta, null, 2) + '\n');
 
   console.log(`[sync] 자료 ${resources.length}건 / 기관 ${orgs.length}곳 · 경고 ${warnings.length}건 (source=${source})`);
+
+  // 시트 줄 수와 올라간 건수가 다르면 그 차이를 여기서 다 설명해야 한다.
+  // 이 줄이 없으면 "90줄 넣었는데 41건" 의 원인을 로그를 다 뒤져야 찾는다.
+  const lost = [...dropped.entries()].sort((a, b) => b[1] - a[1]);
+  const lostTotal = lost.reduce((sum, [, n]) => sum + n, 0);
+  if (lostTotal > 0) {
+    console.log(`[sync] 시트 ${rows.length}행 중 ${resources.length}건 등록, ${lostTotal}건 제외`);
+    for (const [reason, n] of lost) console.log(`         · ${reason} ${n}건`);
+    console.log('       제외된 행은 위 "!" 경고 줄에 행 번호와 함께 있습니다.');
+  }
 
   if (resources.length === 0) {
     console.error('[sync] 자료가 0건입니다. 빌드를 중단합니다.');
