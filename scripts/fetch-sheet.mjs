@@ -151,12 +151,25 @@ export function normalizeDate(v, ctx = '') {
   return null;
 }
 
+// 광고·유입 추적용 꼬리표. 자료 주소의 일부가 아니라 누가 어디서 눌렀는지를
+// 담은 값이라, 붙은 채로 두면 같은 자료가 서로 다른 주소로 보여 중복 검사를
+// 빠져나간다. SNS 에서 복사한 링크에 흔히 붙는다.
+const TRACKING_PARAMS = /^(fbclid|gclid|dclid|msclkid|yclid|igshid|twclid|ttclid|mc_cid|mc_eid|_ga|_gl|spm|ref_src|ref_url|utm_.*)$/i;
+
 function normalizeUrl(v, ctx = '') {
   const s = clean(v);
   if (!s) return '';
   if (!/^https?:\/\//i.test(s)) {
     warn(`${ctx}: sourceUrl 이 http(s) 로 시작하지 않습니다 — "${s}"`);
     return '';
+  }
+  try {
+    const u = new URL(s);
+    const dropped = [...u.searchParams.keys()].filter((k) => TRACKING_PARAMS.test(k));
+    for (const k of dropped) u.searchParams.delete(k);
+    if (dropped.length > 0) return u.toString();
+  } catch {
+    // 파싱이 안 되는 주소는 손대지 않는다. 링크 점검이 따로 잡는다.
   }
   return s;
 }
@@ -453,6 +466,7 @@ async function main() {
   orgs.sort((a, b) => a.code.localeCompare(b.code));
 
   const seen = new Set();
+  const seenUrl = new Map();
   const resources = [];
   const rows = toRecords(resourcesCsv);
   rows.forEach((rec, i) => {
@@ -460,6 +474,11 @@ async function main() {
     if (!r) return;
     if (seen.has(r.id)) { drop('중복 id', `중복 id "${r.id}" — 뒤에 나온 행을 버립니다`); return; }
     seen.add(r.id);
+    // 주소가 같으면 같은 자료다. id 가 다르면 위의 중복 검사를 그냥 빠져나가고,
+    // 사이트에 같은 자료가 두 번 나온다. 어느 쪽을 버릴지는 사람이 정한다.
+    const first = seenUrl.get(r.sourceUrl);
+    if (first) warn(`행 ${i + 2} (${r.id}): 원문 주소가 행 ${first.row} (${first.id}) 과 같습니다 — 같은 자료가 두 번 나옵니다`);
+    else seenUrl.set(r.sourceUrl, { row: i + 2, id: r.id });
     resources.push(r);
   });
 
