@@ -130,7 +130,7 @@
   schoolLevels: string[]       // grades 가 있으면 자동 유도
   grades: string[]             // "초3" 형태. 표기 흔들림은 sync 가 정규화
   subjects: string[]
-  topics: string[]      // 필수, 1개 이상
+  topics: string[]      // 비어도 된다. 비면 주제 페이지에만 안 나온다
   resourceType: string | null
   fileFormats: string[]
   license: string       // "제1유형" | ... | "미표기"
@@ -373,4 +373,7 @@ CSS 변수는 여기 한 번만 정의한다:
 - 상세 페이지 `<title>`, `meta description`, `canonical`, JSON-LD가 모두 채워진다.
 - `npm run build`가 경고 없이 통과하고, `fetch-sheet.mjs`의 데이터 경고는 콘솔에 남는다.
 - 요약이 비어 있는 자료는 빌드 산출물에 포함되지 않는다.
+- **영역(topics)이 비어도 자료는 등록된다.** 학년·과목이 멀쩡한 자료를 영역 하나
+  없다고 통째로 없애면 그 자료를 찾던 사람만 못 찾는다. 주제 페이지에만 안 나오고
+  경고는 남는다.
 - 카운터 저장소가 없거나 죽어도 사이트는 그대로 동작한다.

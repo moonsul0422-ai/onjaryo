@@ -286,7 +286,11 @@ function normalizeResource(rec, index, orgIndex) {
     warn(`${rowRef} (${id}): 정의되지 않은 영역 "${t}" — 무시합니다`);
     return false;
   });
-  if (topics.length === 0) return drop('영역 없음', `${rowRef} (${id}) "${title}": 영역이 하나도 없어 제외합니다`);
+  // 영역이 비어도 버리지 않는다. 학년·과목이 멀쩡한 자료를 영역 하나 없다고
+  // 통째로 없애면, 정작 그 자료를 찾던 사람만 못 찾는다. 주제 페이지에만 안 나온다.
+  if (topics.length === 0) {
+    warn(`${rowRef} (${id}) "${title}": 영역이 비어 있습니다 — 주제 페이지에는 안 나옵니다`);
+  }
 
   const grades = [...new Set(
     splitList(raw.grades)
