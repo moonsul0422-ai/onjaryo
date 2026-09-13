@@ -1,18 +1,38 @@
 ---
 import Base from '../layouts/Base.astro';
 import SearchBox from '../components/SearchBox.astro';
-import GradeNav from '../components/GradeNav.astro';
 import ResourceCard from '../components/ResourceCard.astro';
-import { meta, orgByCode, recent } from '../lib/data.js';
-import { SITE_DESCRIPTION, SITE_NAME, formatDate } from '../lib/site.js';
+import {
+  byGrade, bySubject, byTopic, meta, orgByCode, resources,
+  usedGrades, usedSubjects, usedTopics,
+} from '../lib/data.js';
+import { GRADE_LABELS, GRADE_TO_LEVEL } from '../lib/taxonomy.js';
+import {
+  SITE_DESCRIPTION, SITE_NAME, formatDate, gradeUrl, subjectUrl, topicUrl,
+} from '../lib/site.js';
 
-// 고르는 길은 학년 하나만 둔다.
-// 과목·주제·기관 칩을 처음부터 다 펼치면 고를 것이 많아져 첫 클릭이 늦어진다.
-// 과목은 학년을 고른 다음 화면에서, 나머지는 검색에서 만난다.
+// 첫 화면은 리모컨이다. 학년·과목·주제 버튼을 누르면 페이지를 옮기지 않고
+// 바로 아래 목록이 그 자리에서 좁혀진다. 누를 때마다 새 화면이 열리면
+// 찾는 일이 아니라 돌아다니는 일이 된다.
 //
-// 대신 최근 등록은 표지와 함께 그대로 둔다. 학년 버튼만 놓인 첫 화면은 여기에
-// 무엇이 있는 곳인지 보여 주지 못한다. 표지가 붙은 자료 몇 건이 그 일을 한다.
-const latest = recent(10);
+// 목록은 전부 서버에서 그려 두고 스크립트는 보이고 숨기기만 한다. 카드를
+// 클라이언트에서 만들면 색인에 아무것도 남지 않고 JS 를 끈 사람에게는 빈
+// 페이지가 된다. 그래서 JS 가 없으면 전부 보이고, 버튼은 원래대로 학년·과목·
+// 주제 페이지로 가는 링크로 동작한다.
+//
+// 자료가 몇백 건을 넘어가면 첫 로딩이 무거워진다. 그때는 이 목록을 검색
+// 색인(public/search-index.json)에서 그리는 쪽으로 옮긴다.
+
+const LEVEL_ORDER = ['유아', '초등', '중학', '고교'];
+const gradeGroups = LEVEL_ORDER
+  .map((level) => ({
+    level,
+    grades: usedGrades.filter((g: string) => GRADE_TO_LEVEL[g] === level),
+  }))
+  .filter((group) => group.grades.length > 0);
+
+// 버튼 안에서는 "초등 3학년" 이 아니라 "3학년". 학교급은 왼쪽 이름표가 말한다.
+const gradeShort = (g: string) => (GRADE_LABELS[g] ?? g).replace(/^(초등|중학|고등) /, '');
 ---
 
 <Base title={SITE_NAME} description={SITE_DESCRIPTION} canonical="/">
@@ -25,24 +45,79 @@ const latest = recent(10);
     <SearchBox id="q-home" size="lg" label="자료 검색" placeholder="예: 초3 분수, 안전교육 활동지" />
   </section>
 
-  <section class="pick" aria-labelledby="grade-h">
-    <h2 id="grade-h" class="pick-h">학년으로 찾기</h2>
-    <GradeNav big />
+  <section class="picker" id="browse" aria-labelledby="picker-h">
+    <h2 id="picker-h" class="visually-hidden">분류로 좁히기</h2>
+
+    <div class="prow">
+      <span class="prow-label">학년</span>
+      <div class="prow-body">
+        {gradeGroups.map((group) => (
+          <div class="pgroup">
+            <span class="pgroup-label">{group.level}</span>
+            <ul class="chips">
+              {group.grades.map((g: string) => (
+                <li>
+                  <a class="chip chip-big fbtn" href={gradeUrl(g)} data-k="g" data-v={g}>
+                    {gradeShort(g)}<span class="n">{byGrade.get(g).length}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="prow">
+      <span class="prow-label">과목</span>
+      <ul class="chips">
+        {usedSubjects.map((s: string) => (
+          <li>
+            <a class="chip fbtn" href={subjectUrl(s)} data-k="s" data-v={s}>
+              {s}<span class="n">{bySubject.get(s).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div class="prow">
+      <span class="prow-label">주제</span>
+      <ul class="chips">
+        {usedTopics.map((t: string) => (
+          <li>
+            <a class="chip fbtn" href={topicUrl(t)} data-k="p" data-v={t}>
+              {t}<span class="n">{byTopic.get(t).length}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   </section>
 
-  <p class="more">
-    학년이 정해지지 않았다면 <a href="/search">전체 검색</a>에서 과목·주제·기관으로 좁혀 볼 수 있습니다.
-  </p>
-
-  <section class="section" aria-labelledby="recent-h">
-    <div class="section-head">
-      <h2 id="recent-h">최근 등록</h2>
+  <section class="results" aria-labelledby="list-h">
+    <div class="rhead">
+      <h2 id="list-h">
+        자료 <span id="rcount" aria-live="polite">{resources.length}</span>건
+      </h2>
+      <button id="reset" class="btn btn-quiet" type="button" hidden>선택 해제</button>
     </div>
-    <ul class="rlist">
-      {latest.map((r: any) => (
-        <li><ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} /></li>
+
+    <p id="rempty" class="rempty" hidden>
+      고른 조건에 다 맞는 자료가 없습니다. 누른 버튼을 하나 빼 보세요.
+    </p>
+
+    <ul class="rlist" id="rlist">
+      {resources.map((r: any) => (
+        <li data-g={r.grades.join('|')} data-s={r.subjects.join('|')} data-p={r.topics.join('|')}>
+          <ResourceCard resource={r} org={orgByCode.get(r.orgCode) ?? null} headingLevel={3} />
+        </li>
       ))}
     </ul>
+
+    <p class="rmore">
+      <button id="more" class="btn btn-quiet" type="button" hidden>더 보기</button>
+    </p>
   </section>
 
   <section class="stats" aria-labelledby="stats-h">
@@ -56,10 +131,12 @@ const latest = recent(10);
         <dt>기관</dt>
         <dd>{meta.orgCount}곳</dd>
       </div>
-      <div>
-        <dt>마지막 갱신</dt>
-        <dd><time datetime={meta.syncedAt}>{formatDate(meta.syncedAt.slice(0, 10))}</time></dd>
-      </div>
+      {meta.syncedAt && (
+        <div>
+          <dt>마지막 갱신</dt>
+          <dd><time datetime={meta.syncedAt}>{formatDate(meta.syncedAt.slice(0, 10))}</time></dd>
+        </div>
+      )}
     </dl>
     <p class="stats-note">
       자료 목록은 매일 한 번 갱신됩니다. 빠진 자료가 있다면 <a href="/submit">제보</a>해 주세요.
@@ -67,62 +144,211 @@ const latest = recent(10);
   </section>
 </Base>
 
+<script>
+  // 목록은 이미 HTML 에 다 들어 있다. 여기서는 보이고 숨기기만 한다.
+  const KEYS = ['g', 's', 'p'] as const;
+  const PAGE = 12;
+
+  const listEl = document.getElementById('rlist');
+  const countEl = document.getElementById('rcount');
+  const emptyEl = document.getElementById('rempty');
+  const resetEl = document.getElementById('reset');
+  const moreEl = document.getElementById('more');
+
+  if (listEl && countEl && emptyEl && resetEl && moreEl) {
+    const btns = Array.from(document.querySelectorAll('.fbtn'));
+    // 카드 안에도 칩 목록(li)이 있다. 바로 아래 자식만 집는다.
+    const rows = Array.from(listEl.children).filter((el) => el instanceof HTMLLIElement);
+    const items = rows.map((el) => ({
+      el,
+      g: (el.dataset.g || '').split('|').filter(Boolean),
+      s: (el.dataset.s || '').split('|').filter(Boolean),
+      p: (el.dataset.p || '').split('|').filter(Boolean),
+    }));
+
+    const sel = { g: new Set<string>(), s: new Set<string>(), p: new Set<string>() };
+    let shown = PAGE;
+
+    // 같은 줄 안에서는 하나라도 맞으면 통과(또는), 줄이 다르면 둘 다 맞아야
+    // 통과(그리고). "초3, 초4 를 누르고 수학" 이 사람이 기대하는 뜻이다.
+    const hits = (item: typeof items[number], skip?: string) =>
+      KEYS.every((k) => k === skip || sel[k].size === 0 || item[k].some((v) => sel[k].has(v)));
+
+    function readUrl() {
+      const q = new URLSearchParams(location.search);
+      for (const k of KEYS) {
+        for (const v of (q.get(k) || '').split('|')) if (v) sel[k].add(v);
+      }
+    }
+
+    function writeUrl() {
+      const q = new URLSearchParams();
+      for (const k of KEYS) if (sel[k].size) q.set(k, [...sel[k]].join('|'));
+      const s = q.toString();
+      history.replaceState(null, '', s ? `?${s}` : location.pathname);
+    }
+
+    function apply() {
+      const matched = items.filter((it) => hits(it));
+      for (const it of items) it.el.hidden = true;
+      for (const it of matched.slice(0, shown)) it.el.hidden = false;
+
+      countEl.textContent = String(matched.length);
+      emptyEl.hidden = matched.length > 0;
+
+      const rest = matched.length - shown;
+      moreEl.hidden = rest <= 0;
+      moreEl.textContent = `더 보기 (${rest}건)`;
+
+      const any = KEYS.some((k) => sel[k].size > 0);
+      resetEl.hidden = !any;
+
+      // 버튼마다 "지금 조건에서 이걸 더 누르면 몇 건" 을 다시 센다.
+      // 0 이 되는 버튼을 흐리게 두면 빈 화면으로 들어가는 일이 없다.
+      for (const btn of btns) {
+        if (!(btn instanceof HTMLElement)) continue;
+        const k = btn.dataset.k as 'g' | 's' | 'p';
+        const v = btn.dataset.v || '';
+        const on = sel[k].has(v);
+        const n = items.filter((it) => it[k].includes(v) && hits(it, k)).length;
+
+        if (on) btn.setAttribute('aria-current', 'true');
+        else btn.removeAttribute('aria-current');
+        btn.classList.toggle('chip-zero', !on && n === 0);
+
+        const nEl = btn.querySelector('.n');
+        if (nEl) nEl.textContent = String(n);
+      }
+    }
+
+    for (const btn of btns) {
+      btn.addEventListener('click', (e) => {
+        if (!(btn instanceof HTMLElement)) return;
+        e.preventDefault();
+        const k = btn.dataset.k as 'g' | 's' | 'p';
+        const v = btn.dataset.v || '';
+        if (sel[k].has(v)) sel[k].delete(v);
+        else sel[k].add(v);
+        shown = PAGE;
+        writeUrl();
+        apply();
+      });
+    }
+
+    resetEl.addEventListener('click', () => {
+      for (const k of KEYS) sel[k].clear();
+      shown = PAGE;
+      writeUrl();
+      apply();
+    });
+
+    moreEl.addEventListener('click', () => {
+      shown += PAGE;
+      apply();
+    });
+
+    readUrl();
+    apply();
+  }
+</script>
+
 <style>
   .hero {
     padding: 2rem 0 0.5rem;
     max-width: 42rem;
   }
   .hero h1 {
-    font-family: var(--serif);
-    font-weight: 700;
-    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.3rem);
-    margin-bottom: 0.5rem;
+    font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+    line-height: 1.25;
+    margin-bottom: 0.6rem;
   }
   .hero-lede {
     color: var(--muted);
-    font-size: 1.02rem;
+    font-size: 1rem;
+    line-height: 1.75;
     margin-bottom: 1.1rem;
   }
   .hero-lede b { color: var(--ink); font-weight: 600; }
 
-  .pick {
-    margin-top: 2.5rem;
+  .picker {
+    margin-top: 1.75rem;
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 1.15rem 1.2rem 1.25rem;
+    padding: 0.4rem 1.2rem 1.1rem;
   }
-  .pick-h {
-    font-size: 0.9rem;
-    color: var(--muted);
+  .prow {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    align-items: start;
+    gap: 0.6rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--line);
+  }
+  .prow:first-of-type { border-top: 0; }
+  .prow-label {
+    font-size: 0.86rem;
     font-weight: 600;
-    margin: 0 0 0.85rem;
+    color: var(--muted);
+    padding-top: 0.45rem;
+    white-space: nowrap;
+  }
+  .prow-body { display: grid; gap: 0.45rem; }
+  .pgroup {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr;
+    align-items: start;
+    gap: 0.4rem;
+  }
+  .pgroup-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+    white-space: nowrap;
   }
 
-  .more {
-    margin: 1.1rem 0 0;
-    font-size: 0.9rem;
+  /* 지금 조건에서 0건이 되는 버튼. 눌러도 되지만 먼저 눈에 띌 필요는 없다. */
+  .chip-zero { opacity: 0.4; }
+
+  .results { margin-top: 1.75rem; }
+  .rhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+  }
+  .rhead h2 { margin: 0; font-size: 1.05rem; }
+  .rempty {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--go);
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 0.9rem 1.1rem;
+    margin: 0 0 0.85rem;
     color: var(--muted);
   }
+  .rmore { margin: 1rem 0 0; text-align: center; }
 
   .stats { margin-top: 2.5rem; }
   .statlist {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.6rem 2rem;
-    margin: 0 0 0.7rem;
-    padding: 0.9rem 1.1rem;
-    background: var(--card);
+    gap: 1.5rem 2.5rem;
     border: 1px solid var(--line);
     border-radius: var(--radius);
+    background: var(--card);
+    padding: 1rem 1.2rem;
+    margin: 0 0 0.7rem;
   }
-  .statlist > div { display: flex; flex-direction: column; }
-  .statlist dt { font-size: 0.78rem; color: var(--muted); }
-  .statlist dd {
-    margin: 0;
-    font-size: 1.15rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  .statlist dt { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.15rem; }
+  .statlist dd { margin: 0; font-size: 1.25rem; font-weight: 700; }
+  .stats-note { font-size: 0.86rem; color: var(--muted); margin: 0; }
+
+  @media (max-width: 30rem) {
+    .prow { grid-template-columns: 1fr; gap: 0.35rem; }
+    .prow-label { padding-top: 0; }
+    .pgroup { grid-template-columns: 2.2rem 1fr; }
   }
-  .stats-note { margin: 0; font-size: 0.85rem; color: var(--muted); }
 </style>

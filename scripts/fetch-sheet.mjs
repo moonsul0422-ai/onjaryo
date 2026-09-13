@@ -478,6 +478,31 @@ async function main() {
     console.error('[sync] 자료가 0건입니다. 빌드를 중단합니다.');
     process.exit(1);
   }
+
+  // 시드로 떨어진 걸 조용히 넘기지 않는다. 예시 데이터로도 사이트는 멀쩡히
+  // 만들어지기 때문에, 말해 주지 않으면 배포된 뒤에야 건수가 이상한 걸 눈치챈다.
+  if (source !== 'sheet') {
+    const why = SHEET_ID
+      ? 'SHEET_ID 는 있는데 시트를 읽지 못했습니다. 위의 경고 줄을 보세요.\n'
+        + '     시트가 "링크가 있는 모든 사용자에게 공개" 인지, gid 가 맞는지 확인하세요.'
+      : 'SHEET_ID 환경변수가 없습니다.\n'
+        + '     Vercel → 프로젝트 → Settings → Environment Variables 에 SHEET_ID 를 넣고\n'
+        + '     (자료 탭이 첫 탭이 아니면 SHEET_RESOURCES_GID 도) 다시 배포하세요.';
+
+    console.warn('');
+    console.warn('  ================================================================');
+    console.warn('   시트가 아니라 scripts/seed/*.csv (예시 데이터) 로 빌드했습니다.');
+    console.warn(`   지금 사이트에 올라가는 자료는 예시 ${resources.length}건뿐입니다.`);
+    console.warn(`   원인: ${why}`);
+    console.warn('  ================================================================');
+    console.warn('');
+
+    // 실서비스 배포에 예시 데이터를 올리지 않는다. 급하면 ALLOW_SEED=1.
+    if (process.env.VERCEL_ENV === 'production' && process.env.ALLOW_SEED !== '1') {
+      console.error('[sync] 실서비스 배포를 중단합니다. 예시 데이터를 그대로 올리려면 ALLOW_SEED=1 을 주세요.');
+      process.exit(1);
+    }
+  }
 }
 
 // 다른 스크립트에서 import 할 때는 실행하지 않는다.
