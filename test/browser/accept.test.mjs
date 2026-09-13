@@ -21,7 +21,6 @@ const PAGES = [
   ['태그', `/tag/${enc('안전교육')}/`],
   ['검색', '/search/'],
   ['소개', '/about/'],
-  ['제보', '/submit/'],
 ];
 
 const browser = await chromium.launch({ executablePath: EXE });
@@ -59,8 +58,8 @@ const check = (name, cond, detail = '') => {
     }
     check(`무JS ${name} 본문`, text.length > 200, `본문 ${text.length}자`);
     // 목록·상세는 다음 갈 곳이 본문 안에 있어야 한다.
-    // 소개·제보는 읽는 페이지라 본문 링크가 적은 게 정상이다.
-    if (!['소개', '제보'].includes(name)) {
+    // 소개는 읽는 페이지라 본문 링크가 적은 게 정상이다.
+    if (name !== '소개') {
       check(`무JS ${name} 링크`, links > 3, `링크 ${links}개`);
     }
   }
@@ -70,9 +69,6 @@ const check = (name, cond, detail = '') => {
   check('무JS 목록 카드', cards > 0, `카드 ${cards}개`);
   await page.goto(`${BASE}/r/jje-260304-k2p/`, { waitUntil: 'domcontentloaded' });
   check('무JS 상세 원문링크', await page.locator('a.btn[href^="https://"]').count() > 0);
-  await page.goto(`${BASE}/submit/`, { waitUntil: 'domcontentloaded' });
-  const submitText = await page.locator('main').innerText();
-  check('무JS 제보 안내', /원문 주소/.test(submitText) && /영역/.test(submitText), '제보 안내가 안 읽힘');
   console.log('1. 자바스크립트 끈 상태 — 확인');
   await ctx.close();
 }

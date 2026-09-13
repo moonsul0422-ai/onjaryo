@@ -14,15 +14,11 @@ function readEnv(key) {
 
 export const SITE_URL = (readEnv('SITE_URL') || 'https://onjaryo.vercel.app').replace(/\/$/, '');
 
-// 제보용 구글 폼. 비어 있으면 submit 페이지가 임베드 대신 안내문을 보여준다.
-export const SUBMIT_FORM_URL = readEnv('PUBLIC_SUBMIT_FORM_URL');
-
 export const CONTACT_EMAIL = 'onjaryo.archive@gmail.com';
 
 export const NAV = [
   { href: '/search', label: '검색' },
   { href: '/about', label: '소개' },
-  { href: '/submit', label: '자료 제보' },
 ];
 
 /** 분류 URL. 한글 값을 encodeURIComponent 로 인코딩해 그대로 쓴다. */
