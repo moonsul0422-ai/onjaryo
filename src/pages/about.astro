@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import { meta, usedOrgCodes, orgByCode, byOrg } from '../lib/data.js';
 import { GRADES, SUBJECTS, TOPICS } from '../lib/taxonomy.js';
-import { CONTACT_EMAIL, SITE_NAME, orgUrl } from '../lib/site.js';
+import { SITE_NAME, orgUrl } from '../lib/site.js';
 
 const description = `${SITE_NAME}가 무엇을 모으고 무엇을 모으지 않는지, 자료를 어떻게 분류하고 링크를 어떻게 관리하는지 정리했습니다.`;
 ---
@@ -106,11 +106,6 @@ const description = `${SITE_NAME}가 무엇을 모으고 무엇을 모으지 않
         </li>
       ))}
     </ul>
-
-    <h2>연락</h2>
-    <p>
-      문의는 <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> 로 보내 주시면 됩니다.
-    </p>
   </section>
 </Base>
 

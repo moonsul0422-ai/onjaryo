@@ -14,8 +14,6 @@ function readEnv(key) {
 
 export const SITE_URL = (readEnv('SITE_URL') || 'https://onjaryo.vercel.app').replace(/\/$/, '');
 
-export const CONTACT_EMAIL = 'onjaryo.archive@gmail.com';
-
 export const NAV = [
   { href: '/search', label: '검색' },
   { href: '/about', label: '소개' },
